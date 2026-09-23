@@ -36,7 +36,10 @@ func (w *RayClusterWebhook) ValidateCreate(_ context.Context, rayCluster *rayv1.
 }
 
 // ValidateUpdate implements admission.Validator so a webhook will be registered for the type
-func (w *RayClusterWebhook) ValidateUpdate(_ context.Context, _ *rayv1.RayCluster, rayCluster *rayv1.RayCluster) (admission.Warnings, error) {
+func (w *RayClusterWebhook) ValidateUpdate(_ context.Context, old *rayv1.RayCluster, rayCluster *rayv1.RayCluster) (admission.Warnings, error) {
+	if (old.Spec.HeadGroupSpec == nil) != (rayCluster.Spec.HeadGroupSpec == nil) {
+		return nil, apierrors.NewInvalid(schema.GroupKind{Group: "ray.io", Kind: "RayCluster"}, rayCluster.Name, field.ErrorList{field.Forbidden(field.NewPath("spec", "headGroupSpec"), "adding or removing headGroupSpec requires a new RayCluster")})
+	}
 	rayClusterLog.Info("validate update", "name", rayCluster.Name)
 	return nil, w.validateRayCluster(rayCluster)
 }
@@ -48,6 +51,11 @@ func (w *RayClusterWebhook) ValidateDelete(_ context.Context, _ *rayv1.RayCluste
 
 func (w *RayClusterWebhook) validateRayCluster(rayCluster *rayv1.RayCluster) error {
 	var allErrs field.ErrorList
+	if rayCluster.Spec.HeadGroupSpec == nil {
+		if err := utils.ValidateRayClusterSpec(&rayCluster.Spec, rayCluster.Annotations); err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec"), rayCluster.Spec, err.Error()))
+		}
+	}
 
 	if err := utils.ValidateRayClusterMetadata(rayCluster.ObjectMeta); err != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata").Child("name"), rayCluster.Name, err.Error()))

@@ -1,0 +1,36 @@
+apiVersion: ray.io/v1
+kind: RayCluster
+metadata:
+  name: ray-federation
+  # The identity label does not grant the federation lifecycle ownership.
+  labels:
+    ray.io/federation-member: member-b
+  # Do not add ray.io/federation-owner: this member is managed manually.
+spec:
+  rayVersion: "2.56.0"
+  enableInTreeAutoscaling: false
+  workerGroupSpecs:
+  - groupName: member-cpu
+    replicas: 2
+    minReplicas: 0
+    maxReplicas: 10
+    resources: {CPU: "1", member: "1"}
+    rayStartParams:
+      address: ray-head.internal.example:6379
+      object-store-memory: "134217728"
+    template:
+      metadata:
+        annotations:
+          ray.io/overwrite-container-cmd: "true"
+      spec:
+        restartPolicy: Never
+        containers:
+        - name: ray-worker
+          image: rayproject/ray:2.56.0-py311-cpu
+          command: ["/bin/bash", "-c", "--"]
+          # Interpret the generated command as shell text to preserve quoted JSON
+          # parameters such as --resources. KubeRay injects the environment variable.
+          args: ['ulimit -n 65536; exec /bin/bash -c "$KUBERAY_GEN_RAY_START_CMD"']
+          resources:
+            requests: {cpu: "500m", memory: "1Gi"}
+            limits: {cpu: "2", memory: "2Gi"}

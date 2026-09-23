@@ -59,7 +59,7 @@ func setupNetworkPolicyTest(t *testing.T) {
 			NetworkPolicy: &rayv1.NetworkPolicyConfig{
 				Mode: ptr.To(rayv1.NetworkPolicyDenyAll),
 			},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				RayStartParams: map[string]string{},
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
@@ -82,7 +82,7 @@ func setupNetworkPolicyTest(t *testing.T) {
 			NetworkPolicy: &rayv1.NetworkPolicyConfig{
 				Mode: ptr.To(rayv1.NetworkPolicyDenyAllIngress),
 			},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				RayStartParams: map[string]string{},
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
@@ -105,7 +105,7 @@ func setupNetworkPolicyTest(t *testing.T) {
 			NetworkPolicy: &rayv1.NetworkPolicyConfig{
 				Mode: ptr.To(rayv1.NetworkPolicyDenyAllEgress),
 			},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				RayStartParams: map[string]string{},
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
@@ -140,7 +140,7 @@ func setupNetworkPolicyTest(t *testing.T) {
 			NetworkPolicy: &rayv1.NetworkPolicyConfig{
 				Mode: ptr.To(rayv1.NetworkPolicyDenyAll),
 			},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				RayStartParams: map[string]string{},
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{

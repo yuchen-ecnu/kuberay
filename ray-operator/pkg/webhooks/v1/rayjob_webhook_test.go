@@ -23,7 +23,7 @@ var _ = Describe("RayJob validating webhook", func() {
 				},
 				Spec: rayv1.RayJobSpec{
 					RayClusterSpec: &rayv1.RayClusterSpec{
-						HeadGroupSpec: rayv1.HeadGroupSpec{
+						HeadGroupSpec: &rayv1.HeadGroupSpec{
 							Template: corev1.PodTemplateSpec{
 								Spec: corev1.PodSpec{
 									Containers: []corev1.Container{},
@@ -50,7 +50,7 @@ var _ = Describe("RayJob validating webhook", func() {
 				},
 				Spec: rayv1.RayJobSpec{
 					RayClusterSpec: &rayv1.RayClusterSpec{
-						HeadGroupSpec: rayv1.HeadGroupSpec{
+						HeadGroupSpec: &rayv1.HeadGroupSpec{
 							Template: corev1.PodTemplateSpec{
 								Spec: corev1.PodSpec{
 									Containers: []corev1.Container{},

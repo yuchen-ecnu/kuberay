@@ -79,7 +79,7 @@ func buildRayClusterSpec(imageVersion string, envs *api.EnvironmentVariables, cl
 	}
 	rayClusterSpec := &rayv1api.RayClusterSpec{
 		RayVersion: imageVersion,
-		HeadGroupSpec: rayv1api.HeadGroupSpec{
+		HeadGroupSpec: &rayv1api.HeadGroupSpec{
 			ServiceType:    corev1.ServiceType(clusterSpec.HeadGroupSpec.ServiceType),
 			Template:       *headPodTemplate,
 			RayStartParams: clusterSpec.HeadGroupSpec.RayStartParams,

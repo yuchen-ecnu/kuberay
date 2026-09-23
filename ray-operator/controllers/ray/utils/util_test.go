@@ -369,7 +369,7 @@ func TestGetHeadGroupServiceAccountName(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{
 								ServiceAccountName: "my-service-account",
@@ -388,7 +388,7 @@ func TestGetHeadGroupServiceAccountName(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{},
 						},
@@ -515,7 +515,7 @@ func TestGenerateHeadServiceName(t *testing.T) {
 
 	// Test 2: `HeadService.Name` is not empty.
 	clusterSpecWithHeadService := rayv1.RayClusterSpec{
-		HeadGroupSpec: rayv1.HeadGroupSpec{
+		HeadGroupSpec: &rayv1.HeadGroupSpec{
 			HeadService: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "my-head-svc",
@@ -1273,7 +1273,7 @@ func createRayClusterTemplate(
 ) *rayv1.RayCluster {
 	cluster := &rayv1.RayCluster{
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: createPodSpec(head.cpu, head.memory),
 				},

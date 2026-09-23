@@ -43,7 +43,8 @@ func TestGenerateHashWithoutReplicasAndWorkersToDelete(t *testing.T) {
 	// `hash2` in this case.
 	cluster := rayv1.RayCluster{
 		Spec: rayv1.RayClusterSpec{
-			RayVersion: support.GetRayVersion(),
+			HeadGroupSpec: &rayv1.HeadGroupSpec{},
+			RayVersion:    support.GetRayVersion(),
 			WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
 				{
 					Template: corev1.PodTemplateSpec{
@@ -132,6 +133,7 @@ func TestIsHeadPodRunningAndReady(t *testing.T) {
 	}
 
 	// Initialize a fake client with newScheme and runtimeObjects.
+	ownTestPods(&cluster, headPod)
 	runtimeObjects := []runtime.Object{}
 	fakeClient := clientFake.NewClientBuilder().WithScheme(newScheme).WithRuntimeObjects(runtimeObjects...).Build()
 	ctx := context.TODO()
@@ -192,7 +194,7 @@ func TestReconcileServices_UpdateService(t *testing.T) {
 			Namespace: namespace,
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -695,6 +697,7 @@ func TestLabelHeadPodForServeStatus(t *testing.T) {
 				},
 			}
 			// Initialize a fake client with newScheme and runtimeObjects.
+			ownTestPods(&cluster, headPod)
 			runtimeObjects := []runtime.Object{headPod}
 			fakeClient := clientFake.NewClientBuilder().WithScheme(newScheme).WithRuntimeObjects(runtimeObjects...).Build()
 			ctx := context.TODO()
@@ -2184,7 +2187,7 @@ func TestReconcilePerClusterServeService(t *testing.T) {
 			UID:       "test-uid",
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -2709,7 +2712,7 @@ func Test_RayServiceReconcileManagedBy(t *testing.T) {
 				},
 				Spec: rayv1.RayServiceSpec{
 					RayClusterSpec: rayv1.RayClusterSpec{
-						HeadGroupSpec: rayv1.HeadGroupSpec{
+						HeadGroupSpec: &rayv1.HeadGroupSpec{
 							Template: corev1.PodTemplateSpec{
 								Spec: corev1.PodSpec{
 									Containers: []corev1.Container{

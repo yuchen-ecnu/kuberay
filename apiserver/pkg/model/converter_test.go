@@ -270,7 +270,7 @@ var ClusterSpecTest = rayv1api.RayCluster{
 		},
 	},
 	Spec: rayv1api.RayClusterSpec{
-		HeadGroupSpec: headSpecTest,
+		HeadGroupSpec: &headSpecTest,
 		WorkerGroupSpecs: []rayv1api.WorkerGroupSpec{
 			workerSpecTest,
 		},
@@ -286,7 +286,7 @@ var ClusterSpecAutoscalerTest = rayv1api.RayCluster{
 		},
 	},
 	Spec: rayv1api.RayClusterSpec{
-		HeadGroupSpec: headSpecTest,
+		HeadGroupSpec: &headSpecTest,
 		WorkerGroupSpecs: []rayv1api.WorkerGroupSpec{
 			workerSpecTest,
 		},
@@ -520,6 +520,14 @@ var expectedTolerations = api.PodToleration{
 	Key:      "blah1",
 	Operator: "Exists",
 	Effect:   "NoExecute",
+}
+
+func TestPopulateWorkerOnlyClusterSpec(t *testing.T) {
+	spec := ClusterSpecTest.Spec.DeepCopy()
+	spec.HeadGroupSpec = nil
+	converted := PopulateRayClusterSpec(*spec)
+	assert.Nil(t, converted.HeadGroupSpec)
+	assert.Len(t, converted.WorkerGroupSpec, len(spec.WorkerGroupSpecs))
 }
 
 func TestPopulateHeadNodeSpec(t *testing.T) {

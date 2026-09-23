@@ -23,7 +23,7 @@ var instanceWithIngressEnabled = &rayv1.RayCluster{
 		},
 	},
 	Spec: rayv1.RayClusterSpec{
-		HeadGroupSpec: rayv1.HeadGroupSpec{
+		HeadGroupSpec: &rayv1.HeadGroupSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -46,7 +46,7 @@ var instanceWithIngressEnabledWithoutIngressClass = &rayv1.RayCluster{
 		Namespace: "default",
 	},
 	Spec: rayv1.RayClusterSpec{
-		HeadGroupSpec: rayv1.HeadGroupSpec{
+		HeadGroupSpec: &rayv1.HeadGroupSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{

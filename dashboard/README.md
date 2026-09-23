@@ -2,6 +2,10 @@
 
 This is the repo for the open source dashboard for KubeRay
 
+For a local multi-cluster federation demo with a live YAML editor, topology, and interactive
+cluster shell, see [Federation Lab](demo/federation/README.md). Open `/federation` for the
+workspace or `/terminal` for the full-page terminal.
+
 ![image](https://github.com/user-attachments/assets/3c71169d-44c6-45ee-907d-b8a44043b861)
 
 ## How to deploy with KubeRay Operator and API Server

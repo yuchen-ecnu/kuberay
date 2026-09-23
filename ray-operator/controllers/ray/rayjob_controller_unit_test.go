@@ -62,7 +62,7 @@ func TestCreateRayJobSubmitterIfNeed(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -147,7 +147,7 @@ func TestGetSubmitterTemplate(t *testing.T) {
 		Spec: rayv1.RayJobSpec{
 			Entrypoint: "echo no quote 'single quote' \"double quote\"",
 			RayClusterSpec: &rayv1.RayClusterSpec{
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
@@ -167,7 +167,7 @@ func TestGetSubmitterTemplate(t *testing.T) {
 	}
 	rayClusterInstance := &rayv1.RayCluster{
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -236,7 +236,7 @@ func TestGetSubmitterContainerWithFeatureGate(t *testing.T) {
 			Entrypoint:     "echo test",
 			SubmissionMode: rayv1.SidecarMode,
 			RayClusterSpec: &rayv1.RayClusterSpec{
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{
@@ -918,7 +918,7 @@ func TestGetSubmitterTemplate_WithEnableK8sTokenAuth(t *testing.T) {
 				Mode:               rayv1.AuthModeToken,
 				EnableK8sTokenAuth: new(true),
 			},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -1012,7 +1012,7 @@ func TestBatchSchedulerOnCompletionCalledWhenRayJobComplete(t *testing.T) {
 				Spec: rayv1.RayJobSpec{
 					Entrypoint: "echo hello",
 					RayClusterSpec: &rayv1.RayClusterSpec{
-						HeadGroupSpec: rayv1.HeadGroupSpec{
+						HeadGroupSpec: &rayv1.HeadGroupSpec{
 							Template: corev1.PodTemplateSpec{
 								Spec: corev1.PodSpec{
 									Containers: []corev1.Container{
@@ -1192,7 +1192,7 @@ func TestBatchSchedulerCleanupCalledWhenRayJobSuspendingOrRetrying(t *testing.T)
 				Spec: rayv1.RayJobSpec{
 					Entrypoint: "echo hello",
 					RayClusterSpec: &rayv1.RayClusterSpec{
-						HeadGroupSpec: rayv1.HeadGroupSpec{
+						HeadGroupSpec: &rayv1.HeadGroupSpec{
 							Template: corev1.PodTemplateSpec{
 								Spec: corev1.PodSpec{
 									Containers: []corev1.Container{

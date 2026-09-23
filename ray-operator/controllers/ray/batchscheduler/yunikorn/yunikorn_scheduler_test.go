@@ -545,6 +545,7 @@ func createRayJobWithLabels(name string, namespace string, rayClusterSpec *rayv1
 }
 
 func addHeadPodSpec(rayCluster *rayv1.RayCluster, resource corev1.ResourceList) {
+	rayCluster.Spec.HeadGroupSpec = &rayv1.HeadGroupSpec{}
 	headContainers := []corev1.Container{
 		{
 			Name:  "head-pod",

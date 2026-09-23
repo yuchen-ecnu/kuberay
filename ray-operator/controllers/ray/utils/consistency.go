@@ -7,14 +7,11 @@ import (
 	"github.com/ray-project/kuberay/ray-operator/pkg/features"
 )
 
-// Checks whether the old and new RayClusterStatus are inconsistent by comparing different fields. If the only
-// differences between the old and new status are the `LastUpdateTime` and `ObservedGeneration` fields, the
-// status update will not be triggered.
-//
-// TODO (kevin85421): The field `ObservedGeneration` is not being well-maintained at the moment. In the future,
-// this field should be used to determine whether to update this CR or not.
+// Checks whether the old and new RayClusterStatus are inconsistent. Ignore a
+// timestamp-only change, but acknowledge every newly reconciled spec generation,
+// including worker management changes that leave local worker counts unchanged.
 func InconsistentRayClusterStatus(oldStatus rayv1.RayClusterStatus, newStatus rayv1.RayClusterStatus) bool {
-	if oldStatus.State != newStatus.State || oldStatus.Reason != newStatus.Reason {
+	if oldStatus.State != newStatus.State || oldStatus.Reason != newStatus.Reason || oldStatus.ObservedGeneration != newStatus.ObservedGeneration {
 		return true
 	}
 	if oldStatus.ReadyWorkerReplicas != newStatus.ReadyWorkerReplicas ||

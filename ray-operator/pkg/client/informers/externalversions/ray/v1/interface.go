@@ -8,6 +8,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// FederatedRayClusters returns a FederatedRayClusterInformer.
+	FederatedRayClusters() TypedFederatedRayClusterInformer
 	// RayClusters returns a RayClusterInformer.
 	RayClusters() TypedRayClusterInformer
 	// RayCronJobs returns a RayCronJobInformer.
@@ -27,6 +29,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// FederatedRayClusters returns a TypedFederatedRayClusterInformer.
+func (v *version) FederatedRayClusters() TypedFederatedRayClusterInformer {
+	return &federatedRayClusterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // RayClusters returns a TypedRayClusterInformer.

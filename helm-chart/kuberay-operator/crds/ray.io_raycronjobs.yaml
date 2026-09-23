@@ -5579,6 +5579,12 @@ spec:
                               additionalProperties:
                                 type: string
                               type: object
+                            managedBy:
+                              enum:
+                              - ray.io/raycluster-controller
+                              - ray.io/federated-raycluster-controller
+                              maxLength: 63
+                              type: string
                             maxReplicas:
                               default: 2147483647
                               format: int32
@@ -9593,9 +9599,29 @@ spec:
                           - template
                           type: object
                         type: array
-                    required:
-                    - headGroupSpec
                     type: object
+                    x-kubernetes-validations:
+                    - message: this resource requires a RayCluster with a head
+                      rule: has(self.headGroupSpec)
+                    - message: adding or removing headGroupSpec requires a new RayCluster
+                      rule: has(self.headGroupSpec) == has(oldSelf.headGroupSpec)
+                    - message: workers-only RayClusters require workerGroupSpecs
+                      rule: has(self.headGroupSpec) || (has(self.workerGroupSpecs)
+                        && size(self.workerGroupSpecs) > 0)
+                    - message: workers-only RayClusters cannot enable autoscaling
+                      rule: has(self.headGroupSpec) || !has(self.enableInTreeAutoscaling)
+                        || !self.enableInTreeAutoscaling
+                    - message: workers-only groups require an explicit address and
+                        must be managed by ray.io/raycluster-controller
+                      rule: has(self.headGroupSpec) || self.workerGroupSpecs.all(w,
+                        has(w.rayStartParams) && 'address' in w.rayStartParams &&
+                        size(w.rayStartParams.address) > 0 && (!has(w.managedBy) ||
+                        w.managedBy == 'ray.io/raycluster-controller'))
+                    - message: workers-only RayClusters cannot configure local head
+                        or autoscaler resources
+                      rule: has(self.headGroupSpec) || (!has(self.autoscalerOptions)
+                        && !has(self.gcsFaultToleranceOptions) && !has(self.historyServerOptions)
+                        && !has(self.headServiceAnnotations) && !has(self.tlsOptions))
                   runtimeEnvYAML:
                     type: string
                   shutdownAfterJobFinishes:

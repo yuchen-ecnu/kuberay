@@ -67,7 +67,7 @@ func rayClusterTemplate(name string, namespace string) *rayv1.RayCluster {
 			Namespace: namespace,
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Volumes: []corev1.Volume{sharedMemVolume},
@@ -572,7 +572,9 @@ var _ = Context("Inside the default namespace", func() {
 	testSuspendRayCluster := func(withConditionDisabled bool) {
 		ctx := context.Background()
 		namespace := "default"
-		rayCluster := rayClusterTemplate("raycluster-suspend", namespace)
+		// envtest has no garbage collector. A new RayCluster must not adopt or
+		// delete Pods left by a previous test's different owner UID.
+		rayCluster := rayClusterTemplate(fmt.Sprintf("raycluster-suspend-%t", withConditionDisabled), namespace)
 		headPods := corev1.PodList{}
 		workerPods := corev1.PodList{}
 		allPods := corev1.PodList{}

@@ -1,0 +1,78 @@
+apiVersion: ray.io/v1
+kind: FederatedRayCluster
+metadata:
+  name: ray-federation-autoscaling
+  namespace: ray-federation
+spec:
+  memberCleanupPolicy: Delete
+  primaryCluster:
+    # Federation autoscaling currently supports released Ray 2.56.0 and v2.
+    rayVersion: "2.56.0"
+    enableInTreeAutoscaling: true
+    autoscalerOptions:
+      version: v2
+      idleTimeoutSeconds: 60
+      upscalingMode: Default
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: "0.0.0.0"
+        num-cpus: "0"
+        object-store-memory: "134217728"
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: ray-head
+            image: rayproject/ray:2.56.0-py311-cpu
+            resources:
+              requests: {cpu: "500m", memory: "1Gi"}
+              limits: {cpu: "2", memory: "2Gi"}
+    workerGroups:
+    - groupName: primary-cpu
+      # Initial value only. Ray subsequently writes live targets to the PRC.
+      replicas: 0
+      minReplicas: 0
+      maxReplicas: 2
+      resources: {CPU: "1", primary: "1"}
+      rayStartParams:
+        object-store-memory: "134217728"
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: ray-worker
+            image: rayproject/ray:2.56.0-py311-cpu
+            resources:
+              requests: {cpu: "500m", memory: "1Gi"}
+              limits: {cpu: "2", memory: "2Gi"}
+  memberClusters:
+  - name: member-b
+    namespace: ray-federation
+    # Create this approved kubeconfig Secret in the FRC's primary namespace.
+    # Autoscaling requires credentials for every member.
+    kubeconfigSecretRef:
+      name: member-b-kubeconfig
+    workerGroups:
+    - groupName: member-cpu
+      replicas: 0
+      minReplicas: 0
+      maxReplicas: 2
+      resources: {CPU: "1", member: "1"}
+      rayStartParams:
+        object-store-memory: "134217728"
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: ray-worker
+            image: rayproject/ray:2.56.0-py311-cpu
+            resources:
+              requests: {cpu: "500m", memory: "1Gi"}
+              limits: {cpu: "2", memory: "2Gi"}
+  networking:
+    headEndpoint:
+      mode: UserProvided
+      # Replace with a stable private endpoint routing to the primary head.
+      # Bidirectional head/worker and worker/worker routing is also required.
+      address: ray-head.internal.example
+      gcsPort: 6379

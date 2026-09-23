@@ -10,6 +10,7 @@
 Package v1 contains API Schema definitions for the ray v1 API group
 
 ### Resource Types
+- [FederatedRayCluster](#federatedraycluster)
 - [RayCluster](#raycluster)
 - [RayCronJob](#raycronjob)
 - [RayJob](#rayjob)
@@ -81,6 +82,7 @@ AutoscalerOptions specifies optional configuration for the Ray autoscaler.
 
 
 _Appears in:_
+- [FederationPrimaryCluster](#federationprimarycluster)
 - [RayClusterSpec](#rayclusterspec)
 
 | Field | Description | Default | Validation |
@@ -264,6 +266,118 @@ _Appears in:_
 
 
 
+#### FederatedRayCluster
+
+
+
+
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `ray.io/v1` | | |
+| `kind` _string_ | `FederatedRayCluster` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[FederatedRayClusterSpec](#federatedrayclusterspec)_ |  |  |  |
+
+
+#### FederatedRayClusterSpec
+
+
+
+FederatedRayClusterSpec describes one Ray runtime across private Kubernetes networks.
+
+
+
+_Appears in:_
+- [FederatedRayCluster](#federatedraycluster)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `primaryCluster` _[FederationPrimaryCluster](#federationprimarycluster)_ |  |  |  |
+| `memberClusters` _[FederationMemberCluster](#federationmembercluster) array_ |  |  | MaxItems: 16 <br />MinItems: 1 <br /> |
+| `networking` _[FederationNetworking](#federationnetworking)_ |  |  |  |
+| `memberCleanupPolicy` _string_ | Delete waits for remote cleanup. Orphan explicitly releases remote resources. | Delete | Enum: [Delete Orphan] <br /> |
+
+
+#### FederationHeadEndpoint
+
+
+
+FederationHeadEndpoint is a platform-managed stable private GCS endpoint.
+
+
+
+_Appears in:_
+- [FederationNetworking](#federationnetworking)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `mode` _string_ | Only UserProvided is initially supported; networking is externally managed. | UserProvided | Enum: [UserProvided] <br /> |
+| `address` _string_ | Private IP address or DNS name, without a scheme or port. |  | MinLength: 1 <br /> |
+| `gcsPort` _integer_ |  | 6379 | Maximum: 65535 <br />Minimum: 1 <br /> |
+
+
+#### FederationMemberCluster
+
+
+
+FederationMemberCluster selects an existing remote namespace and optional credential.
+
+
+
+_Appears in:_
+- [FederatedRayClusterSpec](#federatedrayclusterspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ |  |  | MaxLength: 63 <br />Pattern: `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$` <br /> |
+| `kubeconfigSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.28/#localobjectreference-v1-core)_ | The Secret must be in the FRC namespace, labeled ray.io/federation-credential=true,<br />and contain a self-contained kubeconfig in data.kubeconfig.<br />Omit to manage the member manually. The federation never accesses that member API. |  |  |
+| `namespace` _string_ |  |  | MinLength: 1 <br /> |
+| `workerGroups` _[WorkerGroupSpec](#workergroupspec) array_ | Replicas and scaleStrategy initialize new managed groups; the primary<br />RayCluster owns their runtime targets after creation.<br />Targets are projected through the primary RayCluster to this managed member. |  | MinItems: 1 <br />items:XValidation: \{!has(self.managedBy) \|\| self.managedBy == 'ray.io/raycluster-controller' workerGroups managedBy must be omitted or ray.io/raycluster-controller; federation assigns the generated group manager    <nil>\} <br /> |
+
+
+#### FederationNetworking
+
+
+
+FederationNetworking identifies the platform-managed head endpoint.
+Cross-cluster network connectivity is a platform prerequisite.
+
+
+
+_Appears in:_
+- [FederatedRayClusterSpec](#federatedrayclusterspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `headEndpoint` _[FederationHeadEndpoint](#federationheadendpoint)_ |  |  |  |
+
+
+#### FederationPrimaryCluster
+
+
+
+FederationPrimaryCluster configures the primary head, local workers, and the
+single autoscaler running on that head for all managed worker groups.
+
+
+
+_Appears in:_
+- [FederatedRayClusterSpec](#federatedrayclusterspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `headGroupSpec` _[HeadGroupSpec](#headgroupspec)_ |  |  |  |
+| `rayVersion` _string_ |  |  |  |
+| `enableInTreeAutoscaling` _boolean_ | EnableInTreeAutoscaling runs one global autoscaler on the primary head.<br />Federation autoscaling currently requires Ray 2.56.0, autoscaler v2, and<br />kubeconfig credentials for every member. |  |  |
+| `autoscalerOptions` _[AutoscalerOptions](#autoscaleroptions)_ | AutoscalerOptions configures the global autoscaler. The federation supplies<br />its command and args; version must be omitted or v2. |  |  |
+| `workerGroups` _[WorkerGroupSpec](#workergroupspec) array_ | Replicas and scaleStrategy initialize new groups. Existing groups keep<br />their runtime targets in the primary RayCluster in both scaling modes. |  | items:XValidation: \{!has(self.managedBy) \|\| self.managedBy == 'ray.io/raycluster-controller' workerGroups managedBy must be omitted or ray.io/raycluster-controller; federation assigns the generated group manager    <nil>\} <br /> |
+
+
 #### GCSStorageDeletionPolicy
 
 _Underlying type:_ _string_
@@ -358,6 +472,7 @@ HeadGroupSpec are the spec for the head pod
 
 
 _Appears in:_
+- [FederationPrimaryCluster](#federationprimarycluster)
 - [RayClusterSpec](#rayclusterspec)
 
 | Field | Description | Default | Validation |
@@ -530,7 +645,8 @@ RayCluster is the Schema for the RayClusters API
 
 
 
-RayClusterSpec defines the desired state of RayCluster
+RayClusterSpec defines the desired state of RayCluster.
+Omitting headGroupSpec creates workers that join an explicitly configured external head.
 
 
 
@@ -933,10 +1049,13 @@ WorkerGroupSpec are the specs for the worker pods
 
 
 _Appears in:_
+- [FederationMemberCluster](#federationmembercluster)
+- [FederationPrimaryCluster](#federationprimarycluster)
 - [RayClusterSpec](#rayclusterspec)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
+| `managedBy` _string_ | ManagedBy identifies the controller responsible for this worker group.<br />Omitted or ray.io/raycluster-controller means local Pod management.<br />ray.io/federated-raycluster-controller delegates the group to the federation controller;<br />its desired state is retained here but excluded from local provisioning,<br />capacity accounting, and upgrade decisions.<br />Unlike spec.managedBy, this field is mutable: delegation drains previously<br />owned local worker Pods, and returning to local management resumes provisioning.<br />Pods owned by another controller are never adopted or deleted during a switch. |  | Enum: [ray.io/raycluster-controller ray.io/federated-raycluster-controller] <br />MaxLength: 63 <br /> |
 | `suspend` _boolean_ | Suspend indicates whether a worker group should be suspended.<br />A suspended worker group will have all pods deleted.<br />This is not a user-facing API and is only used by RayJob DeletionStrategy. |  |  |
 | `groupName` _string_ | we can have multiple worker groups, we distinguish them by name |  |  |
 | `replicas` _integer_ | Replicas is the number of desired Pods for this worker group. See https://github.com/ray-project/kuberay/pull/1443 for more details about the reason for making this field optional. | 0 |  |

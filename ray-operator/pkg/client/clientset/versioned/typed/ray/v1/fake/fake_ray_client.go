@@ -12,6 +12,10 @@ type FakeRayV1 struct {
 	*testing.Fake
 }
 
+func (c *FakeRayV1) FederatedRayClusters(namespace string) v1.FederatedRayClusterInterface {
+	return newFakeFederatedRayClusters(c, namespace)
+}
+
 func (c *FakeRayV1) RayClusters(namespace string) v1.RayClusterInterface {
 	return newFakeRayClusters(c, namespace)
 }

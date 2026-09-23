@@ -97,6 +97,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = SetupRayServiceWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
+	err = SetupFederatedRayClusterWebhookWithManager(mgr)
+	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:webhook
 

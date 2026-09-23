@@ -1,6 +1,7 @@
 package features
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -11,6 +12,8 @@ import (
 )
 
 const (
+	// Enables federation and workers-only RayClusters.
+	RayFederation featuregate.Feature = "RayFederation"
 	// owner: @rueian @kevin85421 @andrewsykim
 	// rep: https://github.com/ray-project/enhancements/pull/54
 	// alpha: v1.2
@@ -119,6 +122,7 @@ func init() {
 }
 
 var defaultFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	RayFederation:                      {Default: false, PreRelease: featuregate.Alpha},
 	RayClusterStatusConditions:         {Default: true, PreRelease: featuregate.Beta},
 	RayJobDeletionPolicy:               {Default: true, PreRelease: featuregate.Beta},
 	RayMultiHostIndexing:               {Default: true, PreRelease: featuregate.Beta},
@@ -142,6 +146,15 @@ func SetFeatureGateDuringTest(tb testing.TB, f featuregate.Feature, value bool) 
 // Enabled is helper for `utilfeature.DefaultFeatureGate.Enabled()`
 func Enabled(f featuregate.Feature) bool {
 	return utilfeature.DefaultFeatureGate.Enabled(f)
+}
+
+// ValidateDependencies rejects gate combinations that cannot produce the
+// observations required by a controller.
+func ValidateDependencies() error {
+	if Enabled(RayFederation) && !Enabled(RayClusterStatusConditions) {
+		return fmt.Errorf("RayFederation requires RayClusterStatusConditions=true")
+	}
+	return nil
 }
 
 func LogFeatureGates(log logr.Logger) {

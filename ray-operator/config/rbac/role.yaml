@@ -7,6 +7,7 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
   - persistentvolumeclaims
   - pods/status
   - services
@@ -184,6 +185,38 @@ rules:
 - apiGroups:
   - ray.io
   resources:
+  - federatedrayclusters
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ray.io
+  resources:
+  - federatedrayclusters/finalizers
+  - rayclusters/finalizers
+  - raycronjobs/finalizers
+  - rayjobs/finalizers
+  - rayservices/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ray.io
+  resources:
+  - federatedrayclusters/status
+  - rayclusters/status
+  - raycronjobs/status
+  - rayjobs/status
+  - rayservices/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ray.io
+  resources:
   - rayclusters
   - raycronjobs
   - rayjobs
@@ -197,38 +230,9 @@ rules:
   - update
   - watch
 - apiGroups:
-  - ray.io
-  resources:
-  - rayclusters/finalizers
-  - raycronjobs/finalizers
-  - rayjobs/finalizers
-  - rayservices/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ray.io
-  resources:
-  - rayclusters/status
-  - raycronjobs/status
-  - rayjobs/status
-  - rayservices/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - rolebindings
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - watch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
   - roles
   verbs:
   - create

@@ -865,7 +865,7 @@ func newTestRayCluster(workerGroups ...rayv1.WorkerGroupSpec) *rayv1.RayCluster 
 			Labels:    map[string]string{utils.RayGangSchedulingEnabled: "true"},
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec:    rayv1.HeadGroupSpec{Template: corev1.PodTemplateSpec{}},
+			HeadGroupSpec:    &rayv1.HeadGroupSpec{Template: corev1.PodTemplateSpec{}},
 			WorkerGroupSpecs: workerGroups,
 		},
 	}

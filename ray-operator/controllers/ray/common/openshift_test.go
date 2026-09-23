@@ -21,7 +21,7 @@ var instanceWithRouteEnabled = &rayv1.RayCluster{
 		},
 	},
 	Spec: rayv1.RayClusterSpec{
-		HeadGroupSpec: rayv1.HeadGroupSpec{
+		HeadGroupSpec: &rayv1.HeadGroupSpec{
 			EnableIngress: new(true),
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{

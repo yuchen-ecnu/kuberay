@@ -40,7 +40,7 @@ func newMTLSTestCluster(name string) *rayv1.RayCluster {
 			UID:       "test-uid-12345678",
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				RayStartParams: map[string]string{},
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{

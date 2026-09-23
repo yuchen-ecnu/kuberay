@@ -10,7 +10,13 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// RayClusterSpec defines the desired state of RayCluster
+// RayClusterSpec defines the desired state of RayCluster.
+// Omitting headGroupSpec creates workers that join an explicitly configured external head.
+// +kubebuilder:validation:XValidation:rule="has(self.headGroupSpec) == has(oldSelf.headGroupSpec)",message="adding or removing headGroupSpec requires a new RayCluster"
+// +kubebuilder:validation:XValidation:rule="has(self.headGroupSpec) || (has(self.workerGroupSpecs) && size(self.workerGroupSpecs) > 0)",message="workers-only RayClusters require workerGroupSpecs"
+// +kubebuilder:validation:XValidation:rule="has(self.headGroupSpec) || !has(self.enableInTreeAutoscaling) || !self.enableInTreeAutoscaling",message="workers-only RayClusters cannot enable autoscaling"
+// +kubebuilder:validation:XValidation:rule="has(self.headGroupSpec) || self.workerGroupSpecs.all(w, has(w.rayStartParams) && 'address' in w.rayStartParams && size(w.rayStartParams.address) > 0 && (!has(w.managedBy) || w.managedBy == 'ray.io/raycluster-controller'))",message="workers-only groups require an explicit address and must be managed by ray.io/raycluster-controller"
+// +kubebuilder:validation:XValidation:rule="has(self.headGroupSpec) || (!has(self.autoscalerOptions) && !has(self.gcsFaultToleranceOptions) && !has(self.historyServerOptions) && !has(self.headServiceAnnotations) && !has(self.tlsOptions))",message="workers-only RayClusters cannot configure local head or autoscaler resources"
 type RayClusterSpec struct {
 	// UpgradeStrategy defines the scaling policy used when upgrading the RayCluster
 	// +optional
@@ -61,7 +67,8 @@ type RayClusterSpec struct {
 	// +optional
 	TLSOptions *TLSOptions `json:"tlsOptions,omitempty"`
 	// HeadGroupSpec is the spec for the head pod
-	HeadGroupSpec HeadGroupSpec `json:"headGroupSpec"`
+	// +optional
+	HeadGroupSpec *HeadGroupSpec `json:"headGroupSpec,omitempty"`
 	// RayVersion is used to determine the command for the Kubernetes Job managed by RayJob
 	// +optional
 	RayVersion string `json:"rayVersion,omitempty"`
@@ -465,8 +472,27 @@ type IngressOptions struct {
 	TLS []networkingv1.IngressTLS `json:"tls,omitempty"`
 }
 
+const (
+	// WorkerGroupManagedByRayCluster identifies the controller that manages local worker Pods.
+	WorkerGroupManagedByRayCluster = "ray.io/raycluster-controller"
+	// WorkerGroupManagedByFederatedRayCluster delegates the group to the federation controller.
+	WorkerGroupManagedByFederatedRayCluster = "ray.io/federated-raycluster-controller"
+)
+
 // WorkerGroupSpec are the specs for the worker pods
 type WorkerGroupSpec struct {
+	// ManagedBy identifies the controller responsible for this worker group.
+	// Omitted or ray.io/raycluster-controller means local Pod management.
+	// ray.io/federated-raycluster-controller delegates the group to the federation controller;
+	// its desired state is retained here but excluded from local provisioning,
+	// capacity accounting, and upgrade decisions.
+	// Unlike spec.managedBy, this field is mutable: delegation drains previously
+	// owned local worker Pods, and returning to local management resumes provisioning.
+	// Pods owned by another controller are never adopted or deleted during a switch.
+	// +kubebuilder:validation:Enum=ray.io/raycluster-controller;ray.io/federated-raycluster-controller
+	// +kubebuilder:validation:MaxLength=63
+	// +optional
+	ManagedBy *string `json:"managedBy,omitempty"`
 	// Suspend indicates whether a worker group should be suspended.
 	// A suspended worker group will have all pods deleted.
 	// This is not a user-facing API and is only used by RayJob DeletionStrategy.
@@ -522,6 +548,11 @@ type WorkerGroupSpec struct {
 	// Requires the operator to run with `ENABLE_WEBHOOKS` enabled and Ray 2.45.0 or later (`--labels-file`).
 	// +optional
 	Topology *TopologySpec `json:"topology,omitempty"`
+}
+
+// IsExternallyManaged reports whether worker management is delegated to an external controller.
+func (w WorkerGroupSpec) IsExternallyManaged() bool {
+	return w.ManagedBy != nil && *w.ManagedBy == WorkerGroupManagedByFederatedRayCluster
 }
 
 // ScaleStrategy controls scaling of a worker group.

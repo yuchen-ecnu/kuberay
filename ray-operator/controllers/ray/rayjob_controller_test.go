@@ -56,7 +56,7 @@ func rayJobTemplate(name string, namespace string) *rayv1.RayJob {
 			ShutdownAfterJobFinishes: true,
 			RayClusterSpec: &rayv1.RayClusterSpec{
 				RayVersion: support.GetRayVersion(),
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{

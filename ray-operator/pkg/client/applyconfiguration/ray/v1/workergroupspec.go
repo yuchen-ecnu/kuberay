@@ -11,6 +11,15 @@ import (
 //
 // WorkerGroupSpec are the specs for the worker pods
 type WorkerGroupSpecApplyConfiguration struct {
+	// ManagedBy identifies the controller responsible for this worker group.
+	// Omitted or ray.io/raycluster-controller means local Pod management.
+	// ray.io/federated-raycluster-controller delegates the group to the federation controller;
+	// its desired state is retained here but excluded from local provisioning,
+	// capacity accounting, and upgrade decisions.
+	// Unlike spec.managedBy, this field is mutable: delegation drains previously
+	// owned local worker Pods, and returning to local management resumes provisioning.
+	// Pods owned by another controller are never adopted or deleted during a switch.
+	ManagedBy *string `json:"managedBy,omitempty"`
 	// Suspend indicates whether a worker group should be suspended.
 	// A suspended worker group will have all pods deleted.
 	// This is not a user-facing API and is only used by RayJob DeletionStrategy.
@@ -57,6 +66,14 @@ type WorkerGroupSpecApplyConfiguration struct {
 // apply.
 func WorkerGroupSpec() *WorkerGroupSpecApplyConfiguration {
 	return &WorkerGroupSpecApplyConfiguration{}
+}
+
+// WithManagedBy sets the ManagedBy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ManagedBy field is set to the value of the last call.
+func (b *WorkerGroupSpecApplyConfiguration) WithManagedBy(value string) *WorkerGroupSpecApplyConfiguration {
+	b.ManagedBy = &value
+	return b
 }
 
 // WithSuspend sets the Suspend field in the declarative configuration to the given value

@@ -38,21 +38,27 @@ func newTaskGroups() *TaskGroups {
 func newTaskGroupsFromRayClusterSpec(rayClusterSpec *v1.RayClusterSpec) *TaskGroups {
 	taskGroups := newTaskGroups()
 
-	// head group
-	headGroupSpec := rayClusterSpec.HeadGroupSpec
-	headPodMinResource := utils.CalculatePodResource(headGroupSpec.Template.Spec)
-	taskGroups.addTaskGroup(
-		TaskGroup{
-			Name:         utils.RayNodeHeadGroupLabelValue,
-			MinMember:    1,
-			MinResource:  utils.ConvertResourceListToMapString(headPodMinResource),
-			NodeSelector: headGroupSpec.Template.Spec.NodeSelector,
-			Tolerations:  headGroupSpec.Template.Spec.Tolerations,
-			Affinity:     headGroupSpec.Template.Spec.Affinity,
-		})
+	if rayClusterSpec.HeadGroupSpec != nil {
+		// head group
+		headGroupSpec := rayClusterSpec.HeadGroupSpec
+		headPodMinResource := utils.CalculatePodResource(headGroupSpec.Template.Spec)
+		taskGroups.addTaskGroup(
+			TaskGroup{
+				Name:         utils.RayNodeHeadGroupLabelValue,
+				MinMember:    1,
+				MinResource:  utils.ConvertResourceListToMapString(headPodMinResource),
+				NodeSelector: headGroupSpec.Template.Spec.NodeSelector,
+				Tolerations:  headGroupSpec.Template.Spec.Tolerations,
+				Affinity:     headGroupSpec.Template.Spec.Affinity,
+			})
+
+	}
 
 	// worker groups
 	for _, workerGroupSpec := range rayClusterSpec.WorkerGroupSpecs {
+		if workerGroupSpec.IsExternallyManaged() {
+			continue
+		}
 		workerMinResource := utils.CalculatePodResource(workerGroupSpec.Template.Spec)
 		minReplicas := ptr.Deref(workerGroupSpec.MinReplicas, int32(0))
 		minWorkers := minReplicas * workerGroupSpec.NumOfHosts

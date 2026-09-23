@@ -28,7 +28,7 @@ var (
 		},
 		Spec: rayv1.RayServiceSpec{
 			RayClusterSpec: rayv1.RayClusterSpec{
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					ServiceType: corev1.ServiceTypeClusterIP,
 				},
 			},
@@ -44,7 +44,7 @@ var (
 				headServiceAnnotationKey1: headServiceAnnotationValue1,
 				headServiceAnnotationKey2: headServiceAnnotationValue2,
 			},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				RayStartParams: map[string]string{
 					"port":                "6379",
 					"object-manager-port": "12345",
@@ -107,7 +107,7 @@ var (
 				headServiceAnnotationKey1: headServiceAnnotationValue1,
 				headServiceAnnotationKey2: headServiceAnnotationValue2,
 			},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				ServiceType: corev1.ServiceTypeClusterIP,
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
@@ -514,7 +514,7 @@ func TestBuildServeServiceForRayService_WithoutServePort(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -605,7 +605,7 @@ func TestBuildServeServiceWithGrpcPort(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				ServiceType: corev1.ServiceTypeClusterIP,
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
@@ -653,7 +653,7 @@ func TestBuildServeServiceForRayServiceWithGrpcPort(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -720,7 +720,7 @@ func TestUserSpecifiedServeServiceAppProtocolPreserved(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{
@@ -778,7 +778,7 @@ func TestUserSpecifiedServeServiceFallbackPreservesAppProtocol(t *testing.T) {
 			Namespace: "default",
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{

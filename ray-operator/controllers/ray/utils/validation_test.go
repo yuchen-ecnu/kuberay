@@ -283,7 +283,7 @@ func TestValidateRayClusterSpecGcsFaultToleranceOptions(t *testing.T) {
 			features.SetFeatureGateDuringTest(t, features.GCSFaultToleranceEmbeddedStorage, true)
 			err := ValidateRayClusterSpec(&rayv1.RayClusterSpec{
 				GcsFaultToleranceOptions: tt.gcsFaultToleranceOptions,
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					RayStartParams: tt.rayStartParams,
 					Template:       podTemplateSpec(tt.envVars, nil),
 				},
@@ -304,7 +304,7 @@ func TestValidateRayClusterSpecGcsFaultToleranceOptions(t *testing.T) {
 func TestValidateRayClusterSpecEmbeddedGCSFeatureGate(t *testing.T) {
 	spec := &rayv1.RayClusterSpec{
 		GcsFaultToleranceOptions: &rayv1.GcsFaultToleranceOptions{Backend: rayv1.GcsFTBackendRocksDB},
-		HeadGroupSpec: rayv1.HeadGroupSpec{
+		HeadGroupSpec: &rayv1.HeadGroupSpec{
 			Template: podTemplateSpec(nil, nil),
 		},
 	}
@@ -394,7 +394,7 @@ func TestValidateGcsFaultToleranceEmbeddedReservedVolume(t *testing.T) {
 	newSpec := func(mounts []corev1.VolumeMount, volumes []corev1.Volume) *rayv1.RayClusterSpec {
 		return &rayv1.RayClusterSpec{
 			GcsFaultToleranceOptions: &rayv1.GcsFaultToleranceOptions{Backend: rayv1.GcsFTBackendRocksDB},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{{VolumeMounts: mounts}},
@@ -488,7 +488,7 @@ func TestValidateRayClusterSpecRedisPassword(t *testing.T) {
 			rayCluster := &rayv1.RayCluster{
 				Spec: rayv1.RayClusterSpec{
 					GcsFaultToleranceOptions: tt.gcsFaultToleranceOptions,
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						RayStartParams: tt.rayStartParams,
 						Template:       podTemplateSpec(tt.envVars, nil),
 					},
@@ -551,7 +551,7 @@ func TestValidateRayClusterSpecRedisUsername(t *testing.T) {
 			rayCluster := &rayv1.RayCluster{
 				Spec: rayv1.RayClusterSpec{
 					GcsFaultToleranceOptions: tt.gcsFaultToleranceOptions,
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						RayStartParams: tt.rayStartParams,
 						Template:       podTemplateSpec(tt.envVars, nil),
 					},
@@ -636,7 +636,7 @@ func TestValidateRayClusterSpecEmptyContainers(t *testing.T) {
 			name: "headGroupSpec has no containers",
 			rayCluster: &rayv1.RayCluster{
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec: headGroupSpecWithNoContainers,
+					HeadGroupSpec: &headGroupSpecWithNoContainers,
 				},
 			},
 			expectError:  true,
@@ -646,7 +646,7 @@ func TestValidateRayClusterSpecEmptyContainers(t *testing.T) {
 			name: "workerGroupSpec has no containers",
 			rayCluster: &rayv1.RayCluster{
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec:    headGroupSpecWithOneContainer,
+					HeadGroupSpec:    &headGroupSpecWithOneContainer,
 					WorkerGroupSpecs: []rayv1.WorkerGroupSpec{workerGroupSpecWithNoContainers},
 				},
 			},
@@ -657,7 +657,7 @@ func TestValidateRayClusterSpecEmptyContainers(t *testing.T) {
 			name: "valid cluster with containers in both head and worker groups",
 			rayCluster: &rayv1.RayCluster{
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec:    headGroupSpecWithOneContainer,
+					HeadGroupSpec:    &headGroupSpecWithOneContainer,
 					WorkerGroupSpecs: []rayv1.WorkerGroupSpec{workerGroupSpecWithOneContainer},
 				},
 			},
@@ -701,7 +701,7 @@ func TestValidateRayClusterSpecSuspendingWorkerGroup(t *testing.T) {
 			name: "suspend without autoscaler and the feature gate",
 			rayCluster: &rayv1.RayCluster{
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec:    headGroupSpec,
+					HeadGroupSpec:    &headGroupSpec,
 					WorkerGroupSpecs: []rayv1.WorkerGroupSpec{workerGroupSpecSuspended},
 				},
 			},
@@ -713,7 +713,7 @@ func TestValidateRayClusterSpecSuspendingWorkerGroup(t *testing.T) {
 			name: "suspend without autoscaler",
 			rayCluster: &rayv1.RayCluster{
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec:    headGroupSpec,
+					HeadGroupSpec:    &headGroupSpec,
 					WorkerGroupSpecs: []rayv1.WorkerGroupSpec{workerGroupSpecSuspended},
 				},
 			},
@@ -725,7 +725,7 @@ func TestValidateRayClusterSpecSuspendingWorkerGroup(t *testing.T) {
 			name: "suspend with autoscaler",
 			rayCluster: &rayv1.RayCluster{
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec:           headGroupSpec,
+					HeadGroupSpec:           &headGroupSpec,
 					WorkerGroupSpecs:        []rayv1.WorkerGroupSpec{workerGroupSpecSuspended},
 					EnableInTreeAutoscaling: new(true),
 				},
@@ -776,7 +776,7 @@ func TestValidateRayClusterSpecAutoscaler(t *testing.T) {
 		"should return error if autoscaler is enabled and any worker group is suspended": {
 			spec: rayv1.RayClusterSpec{
 				EnableInTreeAutoscaling: new(true),
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, nil),
 				},
 				WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -792,7 +792,7 @@ func TestValidateRayClusterSpecAutoscaler(t *testing.T) {
 		fmt.Sprintf("should return error if %s env var is set to '1' when autoscaler is disabled", RAY_ENABLE_AUTOSCALER_V2): {
 			spec: rayv1.RayClusterSpec{
 				EnableInTreeAutoscaling: new(false),
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec([]corev1.EnvVar{
 						{
 							Name:  RAY_ENABLE_AUTOSCALER_V2,
@@ -806,7 +806,7 @@ func TestValidateRayClusterSpecAutoscaler(t *testing.T) {
 		fmt.Sprintf("should return error if %s env var is set to 'true' when autoscaler is disabled", RAY_ENABLE_AUTOSCALER_V2): {
 			spec: rayv1.RayClusterSpec{
 				EnableInTreeAutoscaling: new(false),
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec([]corev1.EnvVar{
 						{
 							Name:  RAY_ENABLE_AUTOSCALER_V2,
@@ -823,7 +823,7 @@ func TestValidateRayClusterSpecAutoscaler(t *testing.T) {
 				AutoscalerOptions: &rayv1.AutoscalerOptions{
 					Version: ptr.To(rayv1.AutoscalerVersionV2),
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec([]corev1.EnvVar{
 						{
 							Name:  RAY_ENABLE_AUTOSCALER_V2,
@@ -840,7 +840,7 @@ func TestValidateRayClusterSpecAutoscaler(t *testing.T) {
 				AutoscalerOptions: &rayv1.AutoscalerOptions{
 					Version: ptr.To(rayv1.AutoscalerVersionV2),
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, ptr.To(corev1.RestartPolicyAlways)),
 				},
 			},
@@ -852,7 +852,7 @@ func TestValidateRayClusterSpecAutoscaler(t *testing.T) {
 				AutoscalerOptions: &rayv1.AutoscalerOptions{
 					Version: ptr.To(rayv1.AutoscalerVersionV1),
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, nil),
 				},
 				WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -874,7 +874,7 @@ func TestValidateRayClusterSpecAutoscaler(t *testing.T) {
 				AutoscalerOptions: &rayv1.AutoscalerOptions{
 					Version: ptr.To(rayv1.AutoscalerVersionV1),
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, nil),
 				},
 				WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -895,7 +895,7 @@ func TestValidateRayClusterSpecAutoscaler(t *testing.T) {
 				AutoscalerOptions: &rayv1.AutoscalerOptions{
 					Version: ptr.To(rayv1.AutoscalerVersionV2),
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, ptr.To(corev1.RestartPolicyNever)),
 				},
 				WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -917,7 +917,7 @@ func TestValidateRayClusterSpecAutoscaler(t *testing.T) {
 				AutoscalerOptions: &rayv1.AutoscalerOptions{
 					Version: ptr.To(rayv1.AutoscalerVersionV2),
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, nil),
 				},
 				WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -944,7 +944,7 @@ func TestValidateRayClusterSpecAutoscaler(t *testing.T) {
 						},
 					},
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, nil),
 				},
 			},
@@ -967,7 +967,7 @@ func TestValidateRayClusterSpecAutoscaler(t *testing.T) {
 						},
 					},
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, nil),
 				},
 			},
@@ -1012,7 +1012,7 @@ func TestValidateRayClusterSpecAutoscaler_FlexibleRestartPolicy(t *testing.T) {
 				AutoscalerOptions: &rayv1.AutoscalerOptions{
 					Version: ptr.To(rayv1.AutoscalerVersionV2),
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, ptr.To(corev1.RestartPolicyAlways)),
 				},
 			},
@@ -1024,7 +1024,7 @@ func TestValidateRayClusterSpecAutoscaler_FlexibleRestartPolicy(t *testing.T) {
 				AutoscalerOptions: &rayv1.AutoscalerOptions{
 					Version: ptr.To(rayv1.AutoscalerVersionV2),
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, ptr.To(corev1.RestartPolicyAlways)),
 				},
 				WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -1046,7 +1046,7 @@ func TestValidateRayClusterSpecAutoscaler_FlexibleRestartPolicy(t *testing.T) {
 				AutoscalerOptions: &rayv1.AutoscalerOptions{
 					Version: ptr.To(rayv1.AutoscalerVersionV2),
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, nil),
 				},
 				WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -1064,7 +1064,7 @@ func TestValidateRayClusterSpecAutoscaler_FlexibleRestartPolicy(t *testing.T) {
 				AutoscalerOptions: &rayv1.AutoscalerOptions{
 					Version: ptr.To(rayv1.AutoscalerVersionV2),
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, ptr.To(corev1.RestartPolicyAlways)),
 				},
 			},
@@ -1076,7 +1076,7 @@ func TestValidateRayClusterSpecAutoscaler_FlexibleRestartPolicy(t *testing.T) {
 				AutoscalerOptions: &rayv1.AutoscalerOptions{
 					Version: ptr.To(rayv1.AutoscalerVersionV2),
 				},
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, ptr.To(corev1.RestartPolicyAlways)),
 				},
 			},
@@ -1101,7 +1101,7 @@ func TestValidateRayClusterSpec_Resources(t *testing.T) {
 	// Util function to create a RayCluster spec.
 	createSpec := func() rayv1.RayClusterSpec {
 		return rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: podTemplateSpec(nil, nil),
 			},
 			WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -1184,7 +1184,7 @@ func TestValidateRayClusterSpec_Labels(t *testing.T) {
 	// Util function to create a RayCluster spec.
 	createSpec := func() rayv1.RayClusterSpec {
 		return rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: podTemplateSpec(nil, nil),
 			},
 			WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -1329,7 +1329,7 @@ func TestValidateRayClusterSpecRayVersionForAuth(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			spec := &rayv1.RayClusterSpec{
 				RayVersion: tt.rayVersion,
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: podTemplateSpec(nil, nil),
 				},
 				AuthOptions: &rayv1.AuthOptions{
@@ -1543,7 +1543,7 @@ func TestValidateRayJobSpec(t *testing.T) {
 			spec: rayv1.RayJobSpec{
 				SubmissionMode: rayv1.SidecarMode,
 				RayClusterSpec: &rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						Template: podTemplateSpec(nil, ptr.To(corev1.RestartPolicyAlways)),
 					},
 				},
@@ -1666,7 +1666,7 @@ func TestValidateRayJobSpecWithFeatureGate(t *testing.T) {
 					},
 				}, RayClusterSpec: &rayv1.RayClusterSpec{
 					EnableInTreeAutoscaling: new(true),
-					HeadGroupSpec:           headGroupSpecWithOneContainer,
+					HeadGroupSpec:           &headGroupSpecWithOneContainer,
 				},
 			},
 			expectError: true,
@@ -1763,7 +1763,7 @@ func TestValidateRayJobSpecWithFeatureGate(t *testing.T) {
 			name: "headGroupSpec should have at least one container",
 			spec: rayv1.RayJobSpec{
 				RayClusterSpec: &rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{},
+					HeadGroupSpec: &rayv1.HeadGroupSpec{},
 				},
 			},
 			expectError: true,
@@ -1940,7 +1940,7 @@ func TestValidateRayJobSpecWithFeatureGate(t *testing.T) {
 				},
 				RayClusterSpec: &rayv1.RayClusterSpec{
 					EnableInTreeAutoscaling: new(true),
-					HeadGroupSpec:           headGroupSpecWithOneContainer,
+					HeadGroupSpec:           &headGroupSpecWithOneContainer,
 				},
 			},
 			expectError: true,
@@ -2220,7 +2220,7 @@ func TestValidateRayServiceSpec(t *testing.T) {
 			name: "spec.rayClusterConfig.headGroupSpec.headService.metadata.name should not be set",
 			spec: rayv1.RayServiceSpec{
 				RayClusterSpec: rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						HeadService: &corev1.Service{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "my-head-service",
@@ -2358,7 +2358,7 @@ func TestValidateRayServiceMetadata(t *testing.T) {
 
 func createBasicRayClusterSpec() *rayv1.RayClusterSpec {
 	return &rayv1.RayClusterSpec{
-		HeadGroupSpec: rayv1.HeadGroupSpec{
+		HeadGroupSpec: &rayv1.HeadGroupSpec{
 			Template: podTemplateSpec(nil, nil),
 		},
 	}
@@ -2487,7 +2487,7 @@ func TestValidateRayClusterSpec_IdleTimeoutSeconds(t *testing.T) {
 	createSpec := func() rayv1.RayClusterSpec {
 		return rayv1.RayClusterSpec{
 			EnableInTreeAutoscaling: new(true),
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: podTemplateSpec(nil, nil),
 			},
 		}
@@ -2717,7 +2717,7 @@ func TestValidateRayClusterSpec_Priority(t *testing.T) {
 		return rayv1.RayClusterSpec{
 			RayVersion:              "2.56.0",
 			EnableInTreeAutoscaling: new(true),
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: podTemplateSpec(nil, nil),
 			},
 		}
@@ -2926,7 +2926,7 @@ func TestValidateRayCronJobSpec(t *testing.T) {
 					JobTemplate: rayv1.RayJobSpec{
 						Entrypoint: "python test.py",
 						RayClusterSpec: &rayv1.RayClusterSpec{
-							HeadGroupSpec: rayv1.HeadGroupSpec{
+							HeadGroupSpec: &rayv1.HeadGroupSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
@@ -2956,7 +2956,7 @@ func TestValidateRayCronJobSpec(t *testing.T) {
 					JobTemplate: rayv1.RayJobSpec{
 						Entrypoint: "python test.py",
 						RayClusterSpec: &rayv1.RayClusterSpec{
-							HeadGroupSpec: rayv1.HeadGroupSpec{
+							HeadGroupSpec: &rayv1.HeadGroupSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
@@ -3003,7 +3003,7 @@ func TestValidateRayCronJobSpec(t *testing.T) {
 					JobTemplate: rayv1.RayJobSpec{
 						Entrypoint: "python test.py",
 						RayClusterSpec: &rayv1.RayClusterSpec{
-							HeadGroupSpec: rayv1.HeadGroupSpec{
+							HeadGroupSpec: &rayv1.HeadGroupSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{},
@@ -3030,7 +3030,7 @@ func TestValidateRayCronJobSpec(t *testing.T) {
 					JobTemplate: rayv1.RayJobSpec{
 						Entrypoint: "python test.py",
 						RayClusterSpec: &rayv1.RayClusterSpec{
-							HeadGroupSpec: rayv1.HeadGroupSpec{
+							HeadGroupSpec: &rayv1.HeadGroupSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
@@ -3061,7 +3061,7 @@ func TestValidateRayCronJobSpec(t *testing.T) {
 					JobTemplate: rayv1.RayJobSpec{
 						Entrypoint: "python test.py",
 						RayClusterSpec: &rayv1.RayClusterSpec{
-							HeadGroupSpec: rayv1.HeadGroupSpec{
+							HeadGroupSpec: &rayv1.HeadGroupSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
@@ -3092,7 +3092,7 @@ func TestValidateRayCronJobSpec(t *testing.T) {
 					JobTemplate: rayv1.RayJobSpec{
 						Entrypoint: "python test.py",
 						RayClusterSpec: &rayv1.RayClusterSpec{
-							HeadGroupSpec: rayv1.HeadGroupSpec{
+							HeadGroupSpec: &rayv1.HeadGroupSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
@@ -3123,7 +3123,7 @@ func TestValidateRayCronJobSpec(t *testing.T) {
 					JobTemplate: rayv1.RayJobSpec{
 						Entrypoint: "python test.py",
 						RayClusterSpec: &rayv1.RayClusterSpec{
-							HeadGroupSpec: rayv1.HeadGroupSpec{
+							HeadGroupSpec: &rayv1.HeadGroupSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
@@ -3154,7 +3154,7 @@ func TestValidateRayCronJobSpec(t *testing.T) {
 					JobTemplate: rayv1.RayJobSpec{
 						Entrypoint: "python test.py",
 						RayClusterSpec: &rayv1.RayClusterSpec{
-							HeadGroupSpec: rayv1.HeadGroupSpec{
+							HeadGroupSpec: &rayv1.HeadGroupSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
@@ -3185,7 +3185,7 @@ func TestValidateRayCronJobSpec(t *testing.T) {
 					JobTemplate: rayv1.RayJobSpec{
 						Entrypoint: "python test.py",
 						RayClusterSpec: &rayv1.RayClusterSpec{
-							HeadGroupSpec: rayv1.HeadGroupSpec{
+							HeadGroupSpec: &rayv1.HeadGroupSpec{
 								Template: corev1.PodTemplateSpec{
 									Spec: corev1.PodSpec{
 										Containers: []corev1.Container{
@@ -3290,7 +3290,7 @@ func TestValidateRayClusterUpgradeOptions(t *testing.T) {
 				},
 				Spec: rayv1.RayClusterSpec{
 					UpgradeStrategy: tt.upgradeStrategy,
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
@@ -3324,7 +3324,7 @@ func TestValidateRayClusterSpec_WorkerGroupReplicaValidation(t *testing.T) {
 	createSpec := func() rayv1.RayClusterSpec {
 		return rayv1.RayClusterSpec{
 			EnableInTreeAutoscaling: new(false),
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: podTemplateSpec(nil, nil),
 			},
 		}
@@ -3527,7 +3527,7 @@ func TestValidateRayClusterSpec_Auth(t *testing.T) {
 				Spec: rayv1.RayClusterSpec{
 					RayVersion:  "2.55.0", // Required for checks
 					AuthOptions: tt.authOptions,
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						Template: podTemplateSpec(nil, nil),
 					},
 					WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -3732,7 +3732,7 @@ func TestValidateRayClusterSpec_NetworkPolicyRequiresFeatureGate(t *testing.T) {
 			NetworkPolicy: &rayv1.NetworkPolicyConfig{
 				Mode: ptr.To(rayv1.NetworkPolicyDenyAll),
 			},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: podTemplateSpec(nil, nil),
 			},
 			WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -3754,7 +3754,7 @@ func TestValidateTLSOptions(t *testing.T) {
 	features.SetFeatureGateDuringTest(t, features.RayClusterMTLS, true)
 	baseSpec := func() rayv1.RayClusterSpec {
 		return rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{{Name: "ray-head", Image: "rayproject/ray:latest"}},
@@ -3947,7 +3947,7 @@ func TestValidateRayClusterSpec_TLSOptionsRequiresFeatureGate(t *testing.T) {
 	cluster := &rayv1.RayCluster{
 		Spec: rayv1.RayClusterSpec{
 			TLSOptions: &rayv1.TLSOptions{Enabled: new(true)},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: podTemplateSpec(nil, nil),
 			},
 		},
@@ -3970,7 +3970,7 @@ func TestValidateRayClusterSpec_HistoryServerRequiresFeatureGate(t *testing.T) {
 					},
 				},
 			},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: podTemplateSpec(nil, nil),
 			},
 			WorkerGroupSpecs: []rayv1.WorkerGroupSpec{
@@ -4259,7 +4259,7 @@ func TestValidateCollectorOptions(t *testing.T) {
 					HistoryServerOptions: &rayv1.HistoryServerOptions{
 						CollectorOptions: tt.collector,
 					},
-					HeadGroupSpec:    headGroupSpec,
+					HeadGroupSpec:    &headGroupSpec,
 					WorkerGroupSpecs: tt.workerSpecs,
 				},
 			}

@@ -2,6 +2,8 @@
 
 package v1
 
+type FederatedRayClusterExpansion interface{}
+
 type RayClusterExpansion interface{}
 
 type RayCronJobExpansion interface{}

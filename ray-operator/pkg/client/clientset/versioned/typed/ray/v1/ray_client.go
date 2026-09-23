@@ -12,6 +12,7 @@ import (
 
 type RayV1Interface interface {
 	RESTClient() rest.Interface
+	FederatedRayClustersGetter
 	RayClustersGetter
 	RayCronJobsGetter
 	RayJobsGetter
@@ -21,6 +22,10 @@ type RayV1Interface interface {
 // RayV1Client is used to interact with features provided by the ray.io group.
 type RayV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *RayV1Client) FederatedRayClusters(namespace string) FederatedRayClusterInterface {
+	return newFederatedRayClusters(c, namespace)
 }
 
 func (c *RayV1Client) RayClusters(namespace string) RayClusterInterface {

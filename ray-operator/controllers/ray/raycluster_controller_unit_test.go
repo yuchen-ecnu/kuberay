@@ -311,7 +311,7 @@ func setupTest(t *testing.T) {
 		},
 		Spec: rayv1.RayClusterSpec{
 			EnableInTreeAutoscaling: &enableInTreeAutoscaling,
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				RayStartParams: map[string]string{
 					"port":                "6379",
 					"object-manager-port": "12345",
@@ -381,6 +381,11 @@ func setupTest(t *testing.T) {
 				},
 			},
 		},
+	}
+
+	// Real Ray Pods always have their RayCluster as controller owner.
+	for _, fixtures := range [][]runtime.Object{testPods, testPodsNoHeadIP} {
+		ownTestPods(testRayCluster, fixtures...)
 	}
 
 	headService, err := common.BuildServiceForHeadPod(context.Background(), *testRayCluster, nil, nil)
@@ -1344,6 +1349,14 @@ func TestUpdateEndpoints(t *testing.T) {
 	assert.Equal(t, expected, testRayCluster.Status.Endpoints, "RayCluster status endpoints not updated")
 }
 
+func ownTestPods(cluster *rayv1.RayCluster, objects ...runtime.Object) {
+	for _, object := range objects {
+		if pod, ok := object.(*corev1.Pod); ok {
+			pod.OwnerReferences = []metav1.OwnerReference{{APIVersion: "ray.io/v1", Kind: "RayCluster", Name: cluster.Name, UID: cluster.UID, Controller: new(true)}}
+		}
+	}
+}
+
 func TestGetHeadPodIPAndNameFromGetRayClusterHeadPod(t *testing.T) {
 	setupTest(t)
 
@@ -1358,6 +1371,7 @@ func TestGetHeadPodIPAndNameFromGetRayClusterHeadPod(t *testing.T) {
 			},
 		},
 	}
+	ownTestPods(testRayCluster, extraHeadPod)
 
 	tests := []struct {
 		name         string
@@ -1667,6 +1681,7 @@ func TestCalculateStatus(t *testing.T) {
 	}
 
 	// Initialize a fake client with newScheme and runtimeObjects.
+	ownTestPods(testRayCluster, runtimeObjects...)
 	fakeClient := clientFake.NewClientBuilder().WithScheme(newScheme).WithRuntimeObjects(runtimeObjects...).Build()
 	ctx := context.Background()
 
@@ -1828,6 +1843,7 @@ func TestCalculateStatusWithSuspendedWorkerGroups(t *testing.T) {
 	runtimeObjects := []runtime.Object{headPod, headService}
 
 	// Initialize a fake client with newScheme and runtimeObjects.
+	ownTestPods(testRayCluster, runtimeObjects...)
 	fakeClient := clientFake.NewClientBuilder().WithScheme(newScheme).WithRuntimeObjects(runtimeObjects...).Build()
 	ctx := context.Background()
 
@@ -1903,6 +1919,7 @@ func TestCalculateStatusWithReconcileErrorBackAndForth(t *testing.T) {
 	}
 
 	// Initialize a fake client with newScheme and runtimeObjects.
+	ownTestPods(testRayCluster, runtimeObjects...)
 	fakeClient := clientFake.NewClientBuilder().WithScheme(newScheme).WithRuntimeObjects(runtimeObjects...).Build()
 	ctx := context.Background()
 
@@ -1998,6 +2015,7 @@ func TestRayClusterProvisionedCondition(t *testing.T) {
 	}
 
 	runtimeObjects := append([]runtime.Object{headPod, workerPod}, testServices...)
+	ownTestPods(testRayCluster, runtimeObjects...)
 	fakeClient := clientFake.NewClientBuilder().WithScheme(newScheme).WithRuntimeObjects(runtimeObjects...).Build()
 	ctx := context.Background()
 	r := &RayClusterReconciler{
@@ -2847,6 +2865,8 @@ func Test_RedisCleanup(t *testing.T) {
 		},
 	}
 
+	ownTestPods(gcsFTEnabledCluster, headPod, workerPod)
+
 	tests := []struct {
 		name            string
 		hasHeadPod      bool
@@ -3302,6 +3322,7 @@ func TestDeleteAllPods(t *testing.T) {
 	ns := "tmp-ns"
 	ts := metav1.Now()
 	filter := map[string]string{"app": "tmp"}
+	cluster := &rayv1.RayCluster{ObjectMeta: metav1.ObjectMeta{Name: "owner", Namespace: ns, UID: "owner-uid"}}
 
 	p1 := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3326,6 +3347,7 @@ func TestDeleteAllPods(t *testing.T) {
 			Labels:    map[string]string{"app": "other"},
 		},
 	}
+	ownTestPods(cluster, p1, p2)
 
 	fakeClient := clientFake.NewClientBuilder().
 		WithScheme(newScheme).
@@ -3339,12 +3361,12 @@ func TestDeleteAllPods(t *testing.T) {
 	}
 	ctx := context.Background()
 	// The first `deleteAllPods` function call should delete the "alive" Pod.
-	pods, err := testRayClusterReconciler.deleteAllPods(ctx, common.AssociationOptions{client.InNamespace(ns), client.MatchingLabels(filter)})
+	pods, err := testRayClusterReconciler.deleteAllPods(ctx, cluster, common.AssociationOptions{client.InNamespace(ns), client.MatchingLabels(filter)})
 	require.NoError(t, err)
 	assert.Len(t, pods.Items, 2)
 	assert.Subset(t, []string{"alive", "deleted"}, []string{pods.Items[0].Name, pods.Items[1].Name})
 	// The second `deleteAllPods` function call should delete no Pods because none are active.
-	pods, err = testRayClusterReconciler.deleteAllPods(ctx, common.AssociationOptions{client.InNamespace(ns), client.MatchingLabels(filter)})
+	pods, err = testRayClusterReconciler.deleteAllPods(ctx, cluster, common.AssociationOptions{client.InNamespace(ns), client.MatchingLabels(filter)})
 	require.NoError(t, err)
 	assert.Len(t, pods.Items, 1)
 	assert.Equal(t, "deleted", pods.Items[0].Name)
@@ -3898,6 +3920,7 @@ func TestShouldRecreatePodsForUpgrade(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cluster := testRayCluster.DeepCopy()
 			cluster.Spec.UpgradeStrategy = tc.upgradeStrategy
+			ownTestPods(cluster, tc.pods...)
 
 			fakeClient := clientFake.NewClientBuilder().WithRuntimeObjects(tc.pods...).Build()
 			testRayClusterReconciler := &RayClusterReconciler{
@@ -4614,7 +4637,7 @@ func TestReconcile_TLSAutoGenerate_RejectsWithoutCertManager(t *testing.T) {
 		},
 		Spec: rayv1.RayClusterSpec{
 			TLSOptions: &rayv1.TLSOptions{Enabled: new(true)},
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				RayStartParams: map[string]string{"dashboard-host": "0.0.0.0"},
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{

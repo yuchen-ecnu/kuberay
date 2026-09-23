@@ -207,7 +207,7 @@ func BuildServeService(ctx context.Context, rayService rayv1.RayService, rayClus
 	defaultName := utils.GenerateServeServiceName(name)
 	defaultNamespace := namespace
 	defaultType := rayCluster.Spec.HeadGroupSpec.ServiceType
-	if isRayService {
+	if isRayService && rayService.Spec.RayClusterSpec.HeadGroupSpec != nil {
 		defaultType = rayService.Spec.RayClusterSpec.HeadGroupSpec.ServiceType
 	}
 
@@ -330,7 +330,7 @@ func BuildHeadlessServiceForRayCluster(rayCluster rayv1.RayCluster) *corev1.Serv
 // GetServePort finds the container port named "serve" in the RayCluster's head group spec.
 // It returns the default Ray Serve port 8000 if not explicitly defined.
 func GetServePort(cluster *rayv1.RayCluster) gwv1.PortNumber {
-	if cluster == nil || len(cluster.Spec.HeadGroupSpec.Template.Spec.Containers) == 0 {
+	if cluster == nil || cluster.Spec.HeadGroupSpec == nil || len(cluster.Spec.HeadGroupSpec.Template.Spec.Containers) == 0 {
 		return gwv1.PortNumber(utils.DefaultServingPort)
 	}
 

@@ -319,7 +319,7 @@ func GenerateHeadServiceName(crdType CRDType, clusterSpec rayv1.RayClusterSpec, 
 		return fmt.Sprintf("%s-%s-%s", ownerName, rayv1.HeadNode, "svc"), nil
 	case RayClusterCRD:
 		headSvcName := fmt.Sprintf("%s-%s-%s", ownerName, rayv1.HeadNode, "svc")
-		if clusterSpec.HeadGroupSpec.HeadService != nil && clusterSpec.HeadGroupSpec.HeadService.Name != "" {
+		if clusterSpec.HeadGroupSpec != nil && clusterSpec.HeadGroupSpec.HeadService != nil && clusterSpec.HeadGroupSpec.HeadService.Name != "" {
 			headSvcName = clusterSpec.HeadGroupSpec.HeadService.Name
 		}
 		return headSvcName, nil
@@ -410,6 +410,9 @@ func GetWorkerGroupDesiredReplicas(workerGroupSpec rayv1.WorkerGroupSpec) int32 
 func CalculateDesiredReplicas(cluster *rayv1.RayCluster) int32 {
 	count := int32(0)
 	for _, nodeGroup := range cluster.Spec.WorkerGroupSpecs {
+		if nodeGroup.IsExternallyManaged() {
+			continue
+		}
 		count += GetWorkerGroupDesiredReplicas(nodeGroup)
 	}
 
@@ -420,6 +423,9 @@ func CalculateDesiredReplicas(cluster *rayv1.RayCluster) int32 {
 func CalculateMinReplicas(cluster *rayv1.RayCluster) int32 {
 	count := int32(0)
 	for _, nodeGroup := range cluster.Spec.WorkerGroupSpecs {
+		if nodeGroup.IsExternallyManaged() {
+			continue
+		}
 		if nodeGroup.Suspend != nil && *nodeGroup.Suspend {
 			continue
 		}
@@ -434,6 +440,9 @@ func CalculateMinReplicas(cluster *rayv1.RayCluster) int32 {
 func CalculateMaxReplicas(cluster *rayv1.RayCluster) int32 {
 	count := int64(0)
 	for _, nodeGroup := range cluster.Spec.WorkerGroupSpecs {
+		if nodeGroup.IsExternallyManaged() {
+			continue
+		}
 		if nodeGroup.Suspend != nil && *nodeGroup.Suspend {
 			continue
 		}
@@ -478,9 +487,14 @@ func CalculateAvailableReplicas(pods corev1.PodList) int32 {
 
 func CalculateDesiredResources(cluster *rayv1.RayCluster) corev1.ResourceList {
 	desiredResourcesList := []corev1.ResourceList{}
-	headPodResource := CalculatePodResource(cluster.Spec.HeadGroupSpec.Template.Spec)
-	desiredResourcesList = append(desiredResourcesList, headPodResource)
+	if cluster.Spec.HeadGroupSpec != nil {
+		headPodResource := CalculatePodResource(cluster.Spec.HeadGroupSpec.Template.Spec)
+		desiredResourcesList = append(desiredResourcesList, headPodResource)
+	}
 	for _, nodeGroup := range cluster.Spec.WorkerGroupSpecs {
+		if nodeGroup.IsExternallyManaged() {
+			continue
+		}
 		if nodeGroup.Suspend != nil && *nodeGroup.Suspend {
 			continue
 		}
@@ -494,9 +508,14 @@ func CalculateDesiredResources(cluster *rayv1.RayCluster) corev1.ResourceList {
 
 func CalculateMinResources(cluster *rayv1.RayCluster) corev1.ResourceList {
 	minResourcesList := []corev1.ResourceList{}
-	headPodResource := CalculatePodResource(cluster.Spec.HeadGroupSpec.Template.Spec)
-	minResourcesList = append(minResourcesList, headPodResource)
+	if cluster.Spec.HeadGroupSpec != nil {
+		headPodResource := CalculatePodResource(cluster.Spec.HeadGroupSpec.Template.Spec)
+		minResourcesList = append(minResourcesList, headPodResource)
+	}
 	for _, nodeGroup := range cluster.Spec.WorkerGroupSpecs {
+		if nodeGroup.IsExternallyManaged() {
+			continue
+		}
 		if nodeGroup.Suspend != nil && *nodeGroup.Suspend {
 			continue
 		}
@@ -576,7 +595,10 @@ func Contains(elems []string, searchTerm string) bool {
 // GetHeadGroupServiceAccountName returns the head group service account if it exists.
 // Otherwise, it returns the name of the cluster itself.
 func GetHeadGroupServiceAccountName(cluster *rayv1.RayCluster) string {
-	headGroupServiceAccountName := cluster.Spec.HeadGroupSpec.Template.Spec.ServiceAccountName
+	headGroupServiceAccountName := ""
+	if cluster.Spec.HeadGroupSpec != nil {
+		headGroupServiceAccountName = cluster.Spec.HeadGroupSpec.Template.Spec.ServiceAccountName
+	}
 	if headGroupServiceAccountName != "" {
 		return headGroupServiceAccountName
 	}
@@ -646,12 +668,24 @@ func GenerateHashWithoutReplicasAndWorkersToDelete(rayClusterSpec rayv1.RayClust
 	// Mute certain fields that will not trigger new RayCluster preparation. For example,
 	// Autoscaler will update `Replicas` and `WorkersToDelete` when scaling up/down.
 	updatedRayClusterSpec := rayClusterSpec.DeepCopy()
+	// Changes to remote templates must not rebuild the local head or workers.
+	localGroups := make([]rayv1.WorkerGroupSpec, 0, len(updatedRayClusterSpec.WorkerGroupSpecs))
+	for _, group := range updatedRayClusterSpec.WorkerGroupSpecs {
+		if !group.IsExternallyManaged() {
+			// Omitted and explicit local management have identical runtime behavior.
+			group.ManagedBy = nil
+			localGroups = append(localGroups, group)
+		}
+	}
+	updatedRayClusterSpec.WorkerGroupSpecs = localGroups
 
 	// Mute tolerations and scheduling gates for all pod templates.
 	// External controllers like Kueue may inject these fields into the RayCluster
 	// after creation, which should not trigger a new RayCluster preparation.
-	updatedRayClusterSpec.HeadGroupSpec.Template.Spec.Tolerations = nil
-	updatedRayClusterSpec.HeadGroupSpec.Template.Spec.SchedulingGates = nil
+	if updatedRayClusterSpec.HeadGroupSpec != nil {
+		updatedRayClusterSpec.HeadGroupSpec.Template.Spec.Tolerations = nil
+		updatedRayClusterSpec.HeadGroupSpec.Template.Spec.SchedulingGates = nil
+	}
 
 	for i := 0; i < len(updatedRayClusterSpec.WorkerGroupSpecs); i++ {
 		updatedRayClusterSpec.WorkerGroupSpecs[i].Replicas = nil

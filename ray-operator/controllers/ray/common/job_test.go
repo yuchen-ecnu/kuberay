@@ -26,7 +26,8 @@ func rayJobTemplate() *rayv1.RayJob {
 				"testKey": "testValue",
 			},
 			RayClusterSpec: &rayv1.RayClusterSpec{
-				RayVersion: "2.6.0",
+				RayVersion:    "2.6.0",
+				HeadGroupSpec: &rayv1.HeadGroupSpec{},
 			},
 			Entrypoint:          "echo no quote 'single quote' \"double quote\"",
 			EntrypointNumCpus:   1,
@@ -473,7 +474,7 @@ func TestBuildJobSubmitCommandWithOldRayVersion(t *testing.T) {
 func TestBuildJobSubmitCommandWithUnsetRayVersion(t *testing.T) {
 	rayJob := &rayv1.RayJob{
 		Spec: rayv1.RayJobSpec{
-			RayClusterSpec: &rayv1.RayClusterSpec{},
+			RayClusterSpec: &rayv1.RayClusterSpec{HeadGroupSpec: &rayv1.HeadGroupSpec{}},
 			Metadata: map[string]string{
 				"testKey": "testValue",
 			},
@@ -509,7 +510,7 @@ func TestGetSubmitterTemplate(t *testing.T) {
 	}
 	rayCluster := &rayv1.RayCluster{
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{
 						Containers: []corev1.Container{

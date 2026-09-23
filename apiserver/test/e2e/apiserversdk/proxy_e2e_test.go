@@ -20,7 +20,7 @@ func TestGetRayClusterProxy(t *testing.T) {
 			Namespace: tCtx.GetNamespaceName(),
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				RayStartParams: map[string]string{},
 				Template: corev1.PodTemplateSpec{
 					Spec: corev1.PodSpec{

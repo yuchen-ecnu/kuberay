@@ -41,9 +41,8 @@ func TestInconsistentRayClusterStatus(t *testing.T) {
 		Reason:             "test reason",
 	}
 
-	// `inconsistentRayClusterStatus` is used to check whether the old and new RayClusterStatus are inconsistent
-	// by comparing different fields. If the only differences between the old and new status are the `LastUpdateTime`
-	// and `ObservedGeneration` fields, the status update will not be triggered.
+	// Timestamp-only changes are ignored; a new generation must be acknowledged
+	// even when the observed local capacity is unchanged.
 	testCases := []struct {
 		modifyStatus func(*rayv1.RayClusterStatus)
 		name         string
@@ -127,11 +126,11 @@ func TestInconsistentRayClusterStatus(t *testing.T) {
 			expectResult: false,
 		},
 		{
-			name: "ObservedGeneration is updated, expect result to be false",
+			name: "ObservedGeneration is updated, expect result to be true",
 			modifyStatus: func(newStatus *rayv1.RayClusterStatus) {
 				newStatus.ObservedGeneration = oldStatus.ObservedGeneration + 1
 			},
-			expectResult: false,
+			expectResult: true,
 		},
 	}
 

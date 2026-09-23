@@ -57,7 +57,7 @@ func createTestRayCluster(numOfHosts int32) rayv1.RayCluster {
 			Namespace: "default",
 		},
 		Spec: rayv1.RayClusterSpec{
-			HeadGroupSpec: rayv1.HeadGroupSpec{
+			HeadGroupSpec: &rayv1.HeadGroupSpec{
 				Template: corev1.PodTemplateSpec{
 					Spec: headSpec,
 				},

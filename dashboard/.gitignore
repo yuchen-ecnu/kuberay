@@ -6,6 +6,7 @@
 
 # testing
 /coverage
+/demo/federation/test-results/
 
 # next.js
 /.next/

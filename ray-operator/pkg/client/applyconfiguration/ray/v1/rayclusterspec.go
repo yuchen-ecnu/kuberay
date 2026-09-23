@@ -7,7 +7,8 @@ package v1
 //
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-// RayClusterSpec defines the desired state of RayCluster
+// RayClusterSpec defines the desired state of RayCluster.
+// Omitting headGroupSpec creates workers that join an explicitly configured external head.
 type RayClusterSpecApplyConfiguration struct {
 	// UpgradeStrategy defines the scaling policy used when upgrading the RayCluster
 	UpgradeStrategy *RayClusterUpgradeStrategyApplyConfiguration `json:"upgradeStrategy,omitempty"`

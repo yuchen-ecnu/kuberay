@@ -181,9 +181,11 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 .PHONY: api-docs
 api-docs: crd-ref-docs ## Generate CRD documentation.
+	# Federation nests head and worker templates deeper than RayCluster.
 	$(CRD_REF_DOCS) \
     --config=./hack/config.yaml \
     --source-path=./apis/ray \
+    --max-depth=20 \
     --renderer=markdown \
     --output-path=../docs/reference/api.md
 

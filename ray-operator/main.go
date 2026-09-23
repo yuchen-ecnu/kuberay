@@ -33,6 +33,7 @@ import (
 
 	configapi "github.com/ray-project/kuberay/ray-operator/apis/config/v1alpha1"
 	rayv1 "github.com/ray-project/kuberay/ray-operator/apis/ray/v1"
+	"github.com/ray-project/kuberay/ray-operator/controllers/federation"
 	"github.com/ray-project/kuberay/ray-operator/controllers/ray"
 	"github.com/ray-project/kuberay/ray-operator/controllers/ray/batchscheduler"
 	"github.com/ray-project/kuberay/ray-operator/controllers/ray/metrics"
@@ -210,6 +211,7 @@ func main() {
 		exitOnError(err, "Unable to set flag gates for known features")
 	}
 	features.LogFeatureGates(setupLog)
+	exitOnError(features.ValidateDependencies(), "incompatible feature gates")
 
 	// validate the batch scheduler configs,
 	// exit with error if the configs is invalid.
@@ -354,6 +356,9 @@ func main() {
 	}
 	exitOnError(ray.NewReconciler(mgr, rayClusterOptions).SetupWithManager(mgr, config.ReconcileConcurrency),
 		"unable to create controller", "controller", "RayCluster")
+	if features.Enabled(features.RayFederation) {
+		exitOnError((&federation.FederatedReconciler{}).SetupWithManager(mgr, config.ReconcileConcurrency), "unable to create federation controller")
+	}
 
 	if features.Enabled(features.RayClusterMTLS) {
 		if certManagerAvailable {
@@ -377,6 +382,8 @@ func main() {
 		"unable to create controller", "controller", "RayJob")
 
 	if os.Getenv("ENABLE_WEBHOOKS") == "true" {
+		exitOnError(webhooks.SetupFederatedRayClusterWebhookWithManager(mgr),
+			"unable to create webhook", "webhook", "FederatedRayCluster")
 		exitOnError(webhooks.SetupRayClusterWebhookWithManager(mgr),
 			"unable to create webhook", "webhook", "RayCluster")
 		exitOnError(webhooks.SetupRayJobWebhookWithManager(mgr),

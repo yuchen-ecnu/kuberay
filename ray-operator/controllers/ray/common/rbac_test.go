@@ -26,7 +26,7 @@ func TestBuildRoleBindingSubjectAndRoleRefName(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{
 								ServiceAccountName: "my-service-account",
@@ -45,7 +45,7 @@ func TestBuildRoleBindingSubjectAndRoleRefName(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{},
 						},
@@ -62,7 +62,7 @@ func TestBuildRoleBindingSubjectAndRoleRefName(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{},
 						},

@@ -990,6 +990,9 @@ func (r *RayJobReconciler) getOrCreateRayClusterInstance(ctx context.Context, ra
 			return nil, err
 		}
 	}
+	if rayClusterInstance.Spec.HeadGroupSpec == nil {
+		return nil, fmt.Errorf("RayJob requires a RayCluster with a head; %s is workers-only", rayClusterInstance.Name)
+	}
 	logger.Info("Found the associated RayCluster for RayJob", "RayCluster", rayClusterNamespacedName)
 
 	// Verify that RayJob is not in cluster selector mode first to avoid nil pointer dereference error during spec comparison.

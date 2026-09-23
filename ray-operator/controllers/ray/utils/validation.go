@@ -102,6 +102,12 @@ func validateRayGroupLabels(groupName string, rayStartParams, labels map[string]
 
 // Validation for invalid Ray Cluster configurations.
 func ValidateRayClusterSpec(spec *rayv1.RayClusterSpec, annotations map[string]string) error {
+	if spec.HeadGroupSpec == nil {
+		if !features.Enabled(features.RayFederation) {
+			return fmt.Errorf("omitting headGroupSpec requires the RayFederation feature gate")
+		}
+		return ValidateWorkerOnlySpec(spec, annotations)
+	}
 	if len(spec.HeadGroupSpec.Template.Spec.Containers) == 0 {
 		return fmt.Errorf("headGroupSpec should have at least one container")
 	}
@@ -113,52 +119,11 @@ func ValidateRayClusterSpec(spec *rayv1.RayClusterSpec, annotations map[string]s
 		return err
 	}
 
-	// Check if autoscaling is enabled once to avoid repeated calls
+	// Check if autoscaling is enabled once to avoid repeated calls.
 	isAutoscalingEnabled := IsAutoscalingEnabled(spec)
 
-	for _, workerGroup := range spec.WorkerGroupSpecs {
-		if len(workerGroup.Template.Spec.Containers) == 0 {
-			return fmt.Errorf("workerGroupSpec should have at least one container")
-		}
-
-		// When autoscaling is enabled, MinReplicas and MaxReplicas are optional
-		// as users can manually update them and the autoscaler will handle the adjustment.
-		if !isAutoscalingEnabled && (workerGroup.MinReplicas == nil || workerGroup.MaxReplicas == nil) {
-			return fmt.Errorf("worker group %s must set both minReplicas and maxReplicas when autoscaling is disabled", workerGroup.GroupName)
-		}
-		if workerGroup.MinReplicas != nil && *workerGroup.MinReplicas < 0 {
-			return fmt.Errorf("worker group %s has negative minReplicas %d", workerGroup.GroupName, *workerGroup.MinReplicas)
-		}
-		if workerGroup.MaxReplicas != nil && *workerGroup.MaxReplicas < 0 {
-			return fmt.Errorf("worker group %s has negative maxReplicas %d", workerGroup.GroupName, *workerGroup.MaxReplicas)
-		}
-		if workerGroup.MinReplicas != nil && workerGroup.MaxReplicas != nil {
-			if *workerGroup.MinReplicas > *workerGroup.MaxReplicas {
-				return fmt.Errorf("worker group %s has minReplicas %d greater than maxReplicas %d", workerGroup.GroupName, *workerGroup.MinReplicas, *workerGroup.MaxReplicas)
-			}
-		}
-		if err := validateRayGroupResources(workerGroup.GroupName, workerGroup.RayStartParams, workerGroup.Resources); err != nil {
-			return err
-		}
-		if err := validateRayGroupLabels(workerGroup.GroupName, workerGroup.RayStartParams, workerGroup.Labels); err != nil {
-			return err
-		}
-		if err := validateWorkerGroupIdleTimeout(workerGroup, spec); err != nil {
-			return err
-		}
-		if err := validateWorkerGroupPriority(workerGroup, spec); err != nil {
-			return err
-		}
-		if workerGroup.Topology != nil && len(workerGroup.Topology.LabelMappings) > 0 {
-			// ray start --labels-file was added in Ray 2.45.0
-			rayVersion, err := version.ParseGeneric(spec.RayVersion)
-			if err != nil {
-				return fmt.Errorf("worker group %s sets topology, but RayVersion %q is unset or invalid. Ray version 2.45.0 or later is required: %w", workerGroup.GroupName, spec.RayVersion, err)
-			}
-			if rayVersion.LessThan(version.MustParseGeneric("2.45.0")) {
-				return fmt.Errorf("worker group %s sets topology, but minimum Ray version is 2.45.0, got %s", workerGroup.GroupName, spec.RayVersion)
-			}
-		}
+	if err := validateWorkerGroupSpecs(spec); err != nil {
+		return err
 	}
 
 	if annotations[RayFTEnabledAnnotationKey] != "" && spec.GcsFaultToleranceOptions != nil {
@@ -296,35 +261,8 @@ func ValidateRayClusterSpec(spec *rayv1.RayClusterSpec, annotations map[string]s
 		}
 	}
 
-	if IsAuthEnabled(spec) {
-		if spec.RayVersion == "" {
-			return fmt.Errorf("authOptions.mode is 'token' but RayVersion was not specified. Ray version 2.52.0 or later is required")
-		}
-
-		rayVersion, err := version.ParseGeneric(spec.RayVersion)
-		if err != nil {
-			return fmt.Errorf("authOptions.mode is 'token' but RayVersion format is invalid: %s, %w", spec.RayVersion, err)
-		}
-
-		// Require minimum Ray version 2.52.0
-		minVersion := version.MustParseGeneric("2.52.0")
-		if rayVersion.LessThan(minVersion) {
-			return fmt.Errorf("authOptions.mode is 'token' but minimum Ray version is 2.52.0, got %s", spec.RayVersion)
-		}
-
-		if IsK8sAuthEnabled(spec.AuthOptions) {
-			minVersion := version.MustParseGeneric("2.55.0")
-			if rayVersion.LessThan(minVersion) {
-				return fmt.Errorf("authOptions.enableK8sTokenAuth is enabled but minimum Ray version is 2.55.0, got %s", spec.RayVersion)
-			}
-			if spec.AuthOptions.SecretName != nil && *spec.AuthOptions.SecretName != "" {
-				return fmt.Errorf("authOptions.enableK8sTokenAuth is enabled and authOptions.secretName is also set")
-			}
-		}
-	} else {
-		if IsK8sAuthEnabled(spec.AuthOptions) {
-			return fmt.Errorf("authOptions.enableK8sTokenAuth is enabled but authOptions.mode not set to 'token'")
-		}
+	if err := validateAuthOptions(spec); err != nil {
+		return err
 	}
 
 	// Validate NetworkPolicy configuration if set.
@@ -577,6 +515,9 @@ func ValidateRayJobMetadata(metadata metav1.ObjectMeta) error {
 }
 
 func ValidateRayJobSpec(rayJob *rayv1.RayJob) error {
+	if rayJob.Spec.RayClusterSpec != nil && rayJob.Spec.RayClusterSpec.HeadGroupSpec == nil {
+		return fmt.Errorf("RayJob requires a RayCluster with headGroupSpec")
+	}
 	if rayJob.Spec.Suspend && !rayJob.Spec.ShutdownAfterJobFinishes {
 		return fmt.Errorf("The RayJob spec is invalid: a RayJob with shutdownAfterJobFinishes set to false is not allowed to be suspended")
 	}
@@ -711,6 +652,9 @@ func validateInitializingTimeout(annotations map[string]string) error {
 }
 
 func ValidateRayServiceSpec(rayService *rayv1.RayService) error {
+	if rayService.Spec.RayClusterSpec.HeadGroupSpec == nil {
+		return fmt.Errorf("RayService requires a RayCluster with headGroupSpec")
+	}
 	if IsK8sAuthEnabled(rayService.Spec.RayClusterSpec.AuthOptions) {
 		return fmt.Errorf("The RayService spec is invalid: K8s token auth mode is currently not supported for RayService")
 	}
@@ -1172,4 +1116,96 @@ func validateWorkerGroupPriority(workerGroup rayv1.WorkerGroupSpec, spec *rayv1.
 	}
 
 	return fmt.Errorf("worker group %s: priority is set to %d, but autoscaler v2 is not enabled. Priority is only supported with autoscaler v2 enabled", workerGroup.GroupName, *priority)
+}
+
+func validateWorkerGroupSpecs(spec *rayv1.RayClusterSpec) error {
+	isAutoscalingEnabled := IsAutoscalingEnabled(spec)
+	for _, workerGroup := range spec.WorkerGroupSpecs {
+		manager := ptr.Deref(workerGroup.ManagedBy, rayv1.WorkerGroupManagedByRayCluster)
+		if manager != rayv1.WorkerGroupManagedByRayCluster && manager != rayv1.WorkerGroupManagedByFederatedRayCluster {
+			return fmt.Errorf("worker group %s has invalid managedBy %q: must be %s or %s", workerGroup.GroupName, manager, rayv1.WorkerGroupManagedByRayCluster, rayv1.WorkerGroupManagedByFederatedRayCluster)
+		}
+		if workerGroup.IsExternallyManaged() && isAutoscalingEnabled && !IsFederationAutoscalingConfigured(spec) {
+			return fmt.Errorf("worker group %s is managed by %s; enableInTreeAutoscaling is not supported for federation-managed groups", workerGroup.GroupName, manager)
+		}
+		if len(workerGroup.Template.Spec.Containers) == 0 {
+			return fmt.Errorf("workerGroupSpec should have at least one container")
+		}
+
+		// When autoscaling is enabled, MinReplicas and MaxReplicas are optional
+		// as users can manually update them and the autoscaler will handle the adjustment.
+		if !isAutoscalingEnabled && (workerGroup.MinReplicas == nil || workerGroup.MaxReplicas == nil) {
+			return fmt.Errorf("worker group %s must set both minReplicas and maxReplicas when autoscaling is disabled", workerGroup.GroupName)
+		}
+		if workerGroup.MinReplicas != nil && *workerGroup.MinReplicas < 0 {
+			return fmt.Errorf("worker group %s has negative minReplicas %d", workerGroup.GroupName, *workerGroup.MinReplicas)
+		}
+		if workerGroup.MaxReplicas != nil && *workerGroup.MaxReplicas < 0 {
+			return fmt.Errorf("worker group %s has negative maxReplicas %d", workerGroup.GroupName, *workerGroup.MaxReplicas)
+		}
+		if workerGroup.MinReplicas != nil && workerGroup.MaxReplicas != nil {
+			if *workerGroup.MinReplicas > *workerGroup.MaxReplicas {
+				return fmt.Errorf("worker group %s has minReplicas %d greater than maxReplicas %d", workerGroup.GroupName, *workerGroup.MinReplicas, *workerGroup.MaxReplicas)
+			}
+		}
+		if err := validateRayGroupResources(workerGroup.GroupName, workerGroup.RayStartParams, workerGroup.Resources); err != nil {
+			return err
+		}
+		if err := validateRayGroupLabels(workerGroup.GroupName, workerGroup.RayStartParams, workerGroup.Labels); err != nil {
+			return err
+		}
+		if err := validateWorkerGroupIdleTimeout(workerGroup, spec); err != nil {
+			return err
+		}
+		if err := validateWorkerGroupPriority(workerGroup, spec); err != nil {
+			return err
+		}
+		if workerGroup.Topology != nil && len(workerGroup.Topology.LabelMappings) > 0 {
+			// ray start --labels-file was added in Ray 2.45.0.
+			rayVersion, err := version.ParseGeneric(spec.RayVersion)
+			if err != nil {
+				return fmt.Errorf("worker group %s sets topology, but RayVersion %q is unset or invalid. Ray version 2.45.0 or later is required: %w", workerGroup.GroupName, spec.RayVersion, err)
+			}
+			if rayVersion.LessThan(version.MustParseGeneric("2.45.0")) {
+				return fmt.Errorf("worker group %s sets topology, but minimum Ray version is 2.45.0, got %s", workerGroup.GroupName, spec.RayVersion)
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateAuthOptions(spec *rayv1.RayClusterSpec) error {
+	if IsAuthEnabled(spec) {
+		if spec.RayVersion == "" {
+			return fmt.Errorf("authOptions.mode is 'token' but RayVersion was not specified. Ray version 2.52.0 or later is required")
+		}
+
+		rayVersion, err := version.ParseGeneric(spec.RayVersion)
+		if err != nil {
+			return fmt.Errorf("authOptions.mode is 'token' but RayVersion format is invalid: %s, %w", spec.RayVersion, err)
+		}
+
+		// Require minimum Ray version 2.52.0
+		minVersion := version.MustParseGeneric("2.52.0")
+		if rayVersion.LessThan(minVersion) {
+			return fmt.Errorf("authOptions.mode is 'token' but minimum Ray version is 2.52.0, got %s", spec.RayVersion)
+		}
+
+		if IsK8sAuthEnabled(spec.AuthOptions) {
+			minVersion := version.MustParseGeneric("2.55.0")
+			if rayVersion.LessThan(minVersion) {
+				return fmt.Errorf("authOptions.enableK8sTokenAuth is enabled but minimum Ray version is 2.55.0, got %s", spec.RayVersion)
+			}
+			if spec.AuthOptions.SecretName != nil && *spec.AuthOptions.SecretName != "" {
+				return fmt.Errorf("authOptions.enableK8sTokenAuth is enabled and authOptions.secretName is also set")
+			}
+		}
+	} else {
+		if IsK8sAuthEnabled(spec.AuthOptions) {
+			return fmt.Errorf("authOptions.enableK8sTokenAuth is enabled but authOptions.mode not set to 'token'")
+		}
+	}
+
+	return nil
 }

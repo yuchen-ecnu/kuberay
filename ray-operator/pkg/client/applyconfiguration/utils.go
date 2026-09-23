@@ -36,6 +36,24 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &rayv1.DeletionRuleApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("DeletionStrategy"):
 		return &rayv1.DeletionStrategyApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("FederatedRayCluster"):
+		return &rayv1.FederatedRayClusterApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("FederatedRayClusterSpec"):
+		return &rayv1.FederatedRayClusterSpecApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("FederatedRayClusterStatus"):
+		return &rayv1.FederatedRayClusterStatusApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("FederationHeadEndpoint"):
+		return &rayv1.FederationHeadEndpointApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("FederationMemberCluster"):
+		return &rayv1.FederationMemberClusterApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("FederationMemberStatus"):
+		return &rayv1.FederationMemberStatusApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("FederationNetworking"):
+		return &rayv1.FederationNetworkingApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("FederationPrimaryCluster"):
+		return &rayv1.FederationPrimaryClusterApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("FederationWorkerGroupStatus"):
+		return &rayv1.FederationWorkerGroupStatusApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("GcsEmbeddedStorage"):
 		return &rayv1.GcsEmbeddedStorageApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("GcsFaultToleranceOptions"):

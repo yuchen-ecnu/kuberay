@@ -170,7 +170,9 @@ func FromCrdToAPICluster(cluster *rayv1api.RayCluster, events []eventsv1.Event) 
 
 func PopulateRayClusterSpec(spec rayv1api.RayClusterSpec) *api.ClusterSpec {
 	clusterSpec := &api.ClusterSpec{}
-	clusterSpec.HeadGroupSpec = PopulateHeadNodeSpec(spec.HeadGroupSpec)
+	if spec.HeadGroupSpec != nil {
+		clusterSpec.HeadGroupSpec = PopulateHeadNodeSpec(*spec.HeadGroupSpec)
+	}
 	clusterSpec.WorkerGroupSpec = PopulateWorkerNodeSpec(spec.WorkerGroupSpecs)
 	if spec.EnableInTreeAutoscaling != nil && *spec.EnableInTreeAutoscaling {
 		clusterSpec.EnableInTreeAutoscaling = true

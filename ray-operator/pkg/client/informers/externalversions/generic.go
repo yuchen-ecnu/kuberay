@@ -37,6 +37,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=ray.io, Version=v1
+	case v1.SchemeGroupVersion.WithResource("federatedrayclusters"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Ray().V1().FederatedRayClusters().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("rayclusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Ray().V1().RayClusters().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("raycronjobs"):

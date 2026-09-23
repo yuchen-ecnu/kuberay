@@ -104,7 +104,7 @@ var _ = Describe("RayCluster", Ordered, func() {
 		_, err := rayClient.RayClusters("default").Create(context.Background(), &rayv1.RayCluster{
 			ObjectMeta: metav1.ObjectMeta{Name: "proxy-test"},
 			Spec: rayv1.RayClusterSpec{
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					RayStartParams: make(map[string]string),
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
@@ -153,7 +153,7 @@ var _ = Describe("RayJob", Ordered, func() {
 			Spec: rayv1.RayJobSpec{
 				Entrypoint: "echo hello",
 				RayClusterSpec: &rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						RayStartParams: make(map[string]string),
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{
@@ -202,7 +202,7 @@ var _ = Describe("RayService", Ordered, func() {
 			ObjectMeta: metav1.ObjectMeta{Name: "proxy-test-service"},
 			Spec: rayv1.RayServiceSpec{
 				RayClusterSpec: rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						RayStartParams: make(map[string]string),
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{

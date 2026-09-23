@@ -15,7 +15,7 @@ repos:
         args: [--allow-multiple-documents]
         exclude: ^helm-chart/|^mkdocs\.yml$|^benchmark/perf-tests/|^\.krew\.yaml$
       - id: check-added-large-files
-        exclude: ^ray-operator/config/crd/bases/
+        exclude: ^ray-operator/config/crd/bases/|^helm-chart/kuberay-operator/crds/
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: check-vcs-permalinks

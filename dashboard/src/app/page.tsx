@@ -57,6 +57,26 @@ const HomePage = () => {
         <Button
           className="flex flex-col items-start justify-start py-3"
           component={NextLink}
+          href="/federation"
+        >
+          <Stack
+            direction="row"
+            width={200}
+            gap={1}
+            alignItems="center"
+            marginBottom={0.7}
+          >
+            <LanIcon />
+            <Typography level="title-lg">Federation Lab</Typography>
+          </Stack>
+          <Typography level="body-xs" textAlign="left" width={200}>
+            Edit federated YAML and inspect live Ray Pods across local kind
+            clusters.
+          </Typography>
+        </Button>
+        <Button
+          className="flex flex-col items-start justify-start py-3"
+          component={NextLink}
           href="/jobs"
         >
           <Stack

@@ -56,6 +56,7 @@ var DefaultRequeueDuration = 2 * time.Second
 func NewReconciler(mgr manager.Manager, options RayClusterReconcilerOptions) *RayClusterReconciler {
 	return &RayClusterReconciler{
 		Client:                     mgr.GetClient(),
+		APIReader:                  mgr.GetAPIReader(),
 		Scheme:                     mgr.GetScheme(),
 		Recorder:                   mgr.GetEventRecorder("raycluster-controller"),
 		rayClusterScaleExpectation: expectations.NewRayClusterScaleExpectation(mgr.GetClient()),
@@ -66,6 +67,7 @@ func NewReconciler(mgr manager.Manager, options RayClusterReconcilerOptions) *Ra
 // RayClusterReconciler reconciles a RayCluster object
 type RayClusterReconciler struct {
 	client.Client
+	APIReader                  client.Reader
 	Scheme                     *k8sruntime.Scheme
 	Recorder                   events.EventRecorder
 	rayClusterScaleExpectation expectations.RayClusterScaleExpectation
@@ -133,22 +135,33 @@ func (r *RayClusterReconciler) Reconcile(ctx context.Context, request ctrl.Reque
 	return ctrl.Result{}, client.IgnoreNotFound(err)
 }
 
-func (r *RayClusterReconciler) deleteAllPods(ctx context.Context, filters common.AssociationOptions) (pods corev1.PodList, err error) {
-	logger := ctrl.LoggerFrom(ctx)
+func (r *RayClusterReconciler) deleteAllPods(ctx context.Context, instance *rayv1.RayCluster, filters common.AssociationOptions) (pods corev1.PodList, err error) {
 	if err = r.List(ctx, &pods, filters.ToListOptions()...); err != nil {
 		return pods, err
 	}
-	active := 0
-	for _, pod := range pods.Items {
+	// Placement is mutable and may already have been removed. Ownership, rather
+	// than the current group configuration, is the boundary for every deletion.
+	pods.Items = ownedPods(instance, pods.Items)
+	for i := range pods.Items {
+		pod := &pods.Items[i]
 		if pod.DeletionTimestamp.IsZero() {
-			active++
+			if err := client.IgnoreNotFound(r.Delete(ctx, pod, client.Preconditions{UID: &pod.UID})); err != nil {
+				return pods, err
+			}
 		}
 	}
-	if active > 0 {
-		logger.Info("Deleting all Pods with labels", "filters", filters, "Number of active Pods", active)
-		return pods, r.DeleteAllOf(ctx, &corev1.Pod{}, filters.ToDeleteOptions()...)
-	}
 	return pods, nil
+}
+
+func ownedPods(instance *rayv1.RayCluster, pods []corev1.Pod) []corev1.Pod {
+	return slices.DeleteFunc(pods, func(pod corev1.Pod) bool { return !metav1.IsControlledBy(&pod, instance) })
+}
+
+func isExternallyManagedWorker(instance *rayv1.RayCluster, pod corev1.Pod) bool {
+	return pod.Labels[utils.RayNodeTypeLabelKey] == string(rayv1.WorkerNode) &&
+		slices.ContainsFunc(instance.Spec.WorkerGroupSpecs, func(group rayv1.WorkerGroupSpec) bool {
+			return group.IsExternallyManaged() && group.GroupName == pod.Labels[utils.RayNodeGroupLabelKey]
+		})
 }
 
 func (r *RayClusterReconciler) rayClusterReconcile(ctx context.Context, instance *rayv1.RayCluster) (ctrl.Result, error) {
@@ -174,6 +187,10 @@ func (r *RayClusterReconciler) rayClusterReconcile(ctx context.Context, instance
 		r.Recorder.Eventf(instance, nil, corev1.EventTypeWarning, string(utils.InvalidRayClusterSpec), string(utils.ValidateAction),
 			"The RayCluster spec is invalid %s/%s: %v", instance.Namespace, instance.Name, err)
 		return ctrl.Result{}, nil
+	}
+
+	if instance.Spec.HeadGroupSpec == nil {
+		return r.reconcileWorkerOnlyCluster(ctx, instance)
 	}
 
 	// Validate the worker pod restartPolicy,
@@ -268,12 +285,12 @@ func (r *RayClusterReconciler) rayClusterReconcile(ctx context.Context, instance
 			)
 
 			// Delete the head Pod if it exists.
-			headPods, err := r.deleteAllPods(ctx, common.RayClusterHeadPodsAssociationOptions(instance))
+			headPods, err := r.deleteAllPods(ctx, instance, common.RayClusterHeadPodsAssociationOptions(instance))
 			if err != nil {
 				return ctrl.Result{RequeueAfter: DefaultRequeueDuration}, err
 			}
 			// Delete all worker Pods if they exist.
-			if _, err = r.deleteAllPods(ctx, common.RayClusterWorkerPodsAssociationOptions(instance)); err != nil {
+			if _, err = r.deleteAllPods(ctx, instance, common.RayClusterWorkerPodsAssociationOptions(instance)); err != nil {
 				return ctrl.Result{RequeueAfter: DefaultRequeueDuration}, err
 			}
 			if len(headPods.Items) > 0 {
@@ -899,7 +916,7 @@ func (r *RayClusterReconciler) reconcileHeadlessService(ctx context.Context, ins
 	// Check if there are worker groups with NumOfHosts > 1 in the cluster
 	isMultiHost := false
 	for _, workerGroup := range instance.Spec.WorkerGroupSpecs {
-		if workerGroup.NumOfHosts > 1 {
+		if !workerGroup.IsExternallyManaged() && workerGroup.NumOfHosts > 1 {
 			isMultiHost = true
 			break
 		}
@@ -942,7 +959,7 @@ func (r *RayClusterReconciler) reconcilePods(ctx context.Context, instance *rayv
 	statusConditionGateEnabled := features.Enabled(features.RayClusterStatusConditions)
 	if suspendStatus == rayv1.RayClusterSuspending ||
 		(!statusConditionGateEnabled && instance.Spec.Suspend != nil && *instance.Spec.Suspend) {
-		if _, err := r.deleteAllPods(ctx, common.RayClusterAllPodsAssociationOptions(instance)); err != nil {
+		if _, err := r.deleteAllPods(ctx, instance, common.RayClusterAllPodsAssociationOptions(instance)); err != nil {
 			r.Recorder.Eventf(instance, nil, corev1.EventTypeWarning, string(utils.FailedToDeletePodCollection), string(utils.DeleteAction),
 				"Failed deleting Pods due to suspension for RayCluster %s/%s, %v",
 				instance.Namespace, instance.Name, err)
@@ -968,7 +985,7 @@ func (r *RayClusterReconciler) reconcilePods(ctx context.Context, instance *rayv
 	// Check if pods need to be recreated with Recreate upgradeStrategy
 	if r.shouldRecreatePodsForUpgrade(ctx, instance) {
 		logger.Info("RayCluster spec changed with Recreate upgradeStrategy, deleting all pods")
-		if _, err := r.deleteAllPods(ctx, common.RayClusterAllPodsAssociationOptions(instance)); err != nil {
+		if _, err := r.deleteAllPods(ctx, instance, common.RayClusterAllPodsAssociationOptions(instance)); err != nil {
 			r.Recorder.Eventf(instance, nil, corev1.EventTypeWarning, string(utils.FailedToDeletePodCollection), string(utils.DeleteAction),
 				"Failed deleting Pods due to spec change with Recreate upgradeStrategy for RayCluster %s/%s, %v",
 				instance.Namespace, instance.Name, err)
@@ -986,6 +1003,7 @@ func (r *RayClusterReconciler) reconcilePods(ctx context.Context, instance *rayv
 	if err := r.List(ctx, &headPods, common.RayClusterHeadPodsAssociationOptions(instance).ToListOptions()...); err != nil {
 		return err
 	}
+	headPods.Items = ownedPods(instance, headPods.Items)
 	// check if the batch scheduler integration is enabled
 	// call the scheduler plugin if so
 	if r.options.BatchSchedulerManager != nil {
@@ -1010,7 +1028,7 @@ func (r *RayClusterReconciler) reconcilePods(ctx context.Context, instance *rayv
 		shouldDelete, reason := shouldDeletePod(headPod, rayv1.HeadNode)
 		logger.Info("reconcilePods", "head Pod", headPod.Name, "shouldDelete", shouldDelete, "reason", reason)
 		if shouldDelete {
-			if err := r.Delete(ctx, &headPod); err != nil {
+			if err := r.Delete(ctx, &headPod, client.Preconditions{UID: &headPod.UID}); err != nil {
 				r.Recorder.Eventf(instance, nil, corev1.EventTypeWarning, string(utils.FailedToDeleteHeadPod), string(utils.DeleteAction),
 					"Failed deleting head Pod %s/%s; Pod status: %s; Pod restart policy: %s; Ray container terminated status: %v, %v",
 					headPod.Namespace, headPod.Name, headPod.Status.Phase, headPod.Spec.RestartPolicy, getRayContainerStateTerminated(headPod), err)
@@ -1065,8 +1083,31 @@ func (r *RayClusterReconciler) reconcilePods(ctx context.Context, instance *rayv
 		return fmt.Errorf("%d head pods found %v. Please delete extra head pods", len(headPods.Items), headPodNames)
 	}
 
+	return r.reconcileWorkerPods(ctx, instance)
+}
+
+// reconcileWorkerPods is shared by full and workers-only RayClusters.
+func (r *RayClusterReconciler) reconcileWorkerPods(ctx context.Context, instance *rayv1.RayCluster) error {
+	logger := ctrl.LoggerFrom(ctx)
 	// Reconcile worker pods now
 	for _, worker := range instance.Spec.WorkerGroupSpecs {
+		if worker.IsExternallyManaged() {
+			// Delegating a local group drains only this controller's old worker Pods.
+			// The external controller handles workersToDelete for that group.
+			pods := &corev1.PodList{}
+			if err := r.List(ctx, pods, common.RayClusterGroupPodsAssociationOptions(instance, worker.GroupName).ToListOptions()...); err != nil {
+				return err
+			}
+			for i := range pods.Items {
+				pod := &pods.Items[i]
+				if metav1.IsControlledBy(pod, instance) && pod.Labels[utils.RayNodeTypeLabelKey] == string(rayv1.WorkerNode) && pod.DeletionTimestamp.IsZero() {
+					if err := client.IgnoreNotFound(r.Delete(ctx, pod, client.Preconditions{UID: &pod.UID})); err != nil {
+						return err
+					}
+				}
+			}
+			continue
+		}
 		if !r.rayClusterScaleExpectation.IsSatisfied(ctx, instance.Namespace, instance.Name, worker.GroupName) {
 			logger.Info("reconcilePods", "worker group", worker.GroupName, "Expectation", "NotSatisfiedGroupExpectations, reconcile the group later")
 			continue
@@ -1079,10 +1120,18 @@ func (r *RayClusterReconciler) reconcilePods(ctx context.Context, instance *rayv
 		if err := r.List(ctx, &workerPods, common.RayClusterGroupPodsAssociationOptions(instance, worker.GroupName).ToListOptions()...); err != nil {
 			return err
 		}
+		workerPods.Items = ownedPods(instance, workerPods.Items)
+
+		if instance.Spec.HeadGroupSpec == nil {
+			// Suspension is handled by the owner-checked pruning path.
+			if worker.Suspend != nil && *worker.Suspend {
+				continue
+			}
+		}
 
 		// Delete all workers if worker group is suspended and skip reconcile
 		if worker.Suspend != nil && *worker.Suspend {
-			if _, err := r.deleteAllPods(ctx, common.RayClusterGroupPodsAssociationOptions(instance, worker.GroupName)); err != nil {
+			if _, err := r.deleteAllPods(ctx, instance, common.RayClusterGroupPodsAssociationOptions(instance, worker.GroupName)); err != nil {
 				r.Recorder.Eventf(instance, nil, corev1.EventTypeWarning, string(utils.FailedToDeleteWorkerPodCollection), string(utils.DeleteAction),
 					"Failed deleting worker Pods for suspended group %s in RayCluster %s/%s, %v", worker.GroupName, instance.Namespace, instance.Name, err)
 				return errstd.Join(utils.ErrFailedDeleteWorkerPod, err)
@@ -1101,6 +1150,21 @@ func (r *RayClusterReconciler) reconcilePods(ctx context.Context, instance *rayv
 			continue
 		}
 
+		if instance.Spec.HeadGroupSpec == nil {
+			stale := []corev1.Pod{}
+			for _, pod := range workerPods.Items {
+				if pod.DeletionTimestamp.IsZero() && pod.Labels[utils.WorkerTemplateHashLabel] != utils.WorkerTemplateHash(instance, worker) {
+					stale = append(stale, pod)
+				}
+			}
+			if len(stale) > 0 {
+				if err := r.deletePods(ctx, instance, stale, worker.GroupName, "WorkerTemplateChanged"); err != nil {
+					return err
+				}
+				continue
+			}
+		}
+
 		// Delete unhealthy worker Pods.
 		deletedWorkers := make(map[string]struct{})
 		deleted := struct{}{}
@@ -1111,7 +1175,7 @@ func (r *RayClusterReconciler) reconcilePods(ctx context.Context, instance *rayv
 			if shouldDelete {
 				numDeletedUnhealthyWorkerPods++
 				deletedWorkers[workerPod.Name] = deleted
-				if err := r.Delete(ctx, &workerPod); err != nil {
+				if err := r.Delete(ctx, &workerPod, client.Preconditions{UID: &workerPod.UID}); err != nil {
 					r.Recorder.Eventf(instance, nil, corev1.EventTypeWarning, string(utils.FailedToDeleteWorkerPod), string(utils.DeleteAction),
 						"Failed deleting worker Pod %s/%s; Pod status: %s; Pod restart policy: %s; Ray container terminated status: %v, %v",
 						workerPod.Namespace, workerPod.Name, workerPod.Status.Phase, workerPod.Spec.RestartPolicy, getRayContainerStateTerminated(workerPod), err)
@@ -1133,11 +1197,13 @@ func (r *RayClusterReconciler) reconcilePods(ctx context.Context, instance *rayv
 		// Essentially WorkersToDelete has to be deleted to meet the expectations of the Autoscaler.
 		logger.Info("reconcilePods", "removing the pods in the scaleStrategy of", worker.GroupName)
 		for _, podsToDelete := range worker.ScaleStrategy.WorkersToDelete {
-			pod := corev1.Pod{}
-			pod.Name = podsToDelete
-			pod.Namespace = utils.GetNamespace(instance.ObjectMeta)
+			index := slices.IndexFunc(workerPods.Items, func(p corev1.Pod) bool { return p.Name == podsToDelete })
+			if index < 0 {
+				continue
+			}
+			pod := workerPods.Items[index]
 			logger.Info("Deleting pod", "namespace", pod.Namespace, "name", pod.Name)
-			if err := r.Delete(ctx, &pod); err != nil {
+			if err := r.Delete(ctx, &pod, client.Preconditions{UID: &pod.UID}); err != nil {
 				if !errors.IsNotFound(err) {
 					logger.Info("reconcilePods", "Fail to delete Pod", pod.Name, "error", err)
 					r.Recorder.Eventf(instance, nil, corev1.EventTypeWarning, string(utils.FailedToDeleteWorkerPod), string(utils.DeleteAction), "Failed deleting pod %s/%s, %v", pod.Namespace, pod.Name, err)
@@ -1233,13 +1299,25 @@ func (r *RayClusterReconciler) reconcilePods(ctx context.Context, instance *rayv
 			// Case 2: If Autoscaler is enabled, we will respect the value of the feature flag. If the feature flag environment variable
 			// is not set, we will disable random Pod deletion by default.
 			if !enableInTreeAutoscaling || enableRandomPodDelete {
+				if instance.Spec.HeadGroupSpec == nil {
+					// Cancel unready capacity before disrupting healthy remote workers.
+					slices.SortStableFunc(runningPods.Items, func(a, b corev1.Pod) int {
+						if utils.IsRunningAndReady(&a) == utils.IsRunningAndReady(&b) {
+							return 0
+						}
+						if utils.IsRunningAndReady(&a) {
+							return 1
+						}
+						return -1
+					})
+				}
 				// diff < 0 means that we need to delete some Pods to meet the desired number of replicas.
 				randomlyRemovedWorkers := -diff
 				logger.Info("reconcilePods", "Number workers to delete randomly", randomlyRemovedWorkers, "Worker group", worker.GroupName)
 				for i := range randomlyRemovedWorkers {
 					randomPodToDelete := runningPods.Items[i]
 					logger.Info("Randomly deleting Pod", "progress", fmt.Sprintf("%d / %d", i+1, randomlyRemovedWorkers), "with name", randomPodToDelete.Name)
-					if err := r.Delete(ctx, &randomPodToDelete); err != nil {
+					if err := r.Delete(ctx, &randomPodToDelete, client.Preconditions{UID: &randomPodToDelete.UID}); err != nil {
 						if !errors.IsNotFound(err) {
 							r.Recorder.Eventf(instance, nil, corev1.EventTypeWarning, string(utils.FailedToDeleteWorkerPod), string(utils.DeleteAction), "Failed deleting Pod %s/%s, %v", randomPodToDelete.Namespace, randomPodToDelete.Name, err)
 							return errstd.Join(utils.ErrFailedDeleteWorkerPod, err)
@@ -1262,7 +1340,7 @@ func (r *RayClusterReconciler) reconcilePods(ctx context.Context, instance *rayv
 func (r *RayClusterReconciler) deletePods(ctx context.Context, instance *rayv1.RayCluster, podsToDelete []corev1.Pod, groupName string, reason string) error {
 	for i := range podsToDelete {
 		pod := podsToDelete[i]
-		if err := r.Delete(ctx, &pod); err != nil {
+		if err := r.Delete(ctx, &pod, client.Preconditions{UID: &pod.UID}); err != nil {
 			if errors.IsNotFound(err) {
 				continue
 			}
@@ -1473,6 +1551,7 @@ func (r *RayClusterReconciler) shouldRecreatePodsForUpgrade(ctx context.Context,
 		logger.Error(err, "Failed to list head pods for upgrade check")
 		return false
 	}
+	headPods.Items = ownedPods(instance, headPods.Items)
 
 	// If the KubeRay version has changed, skip recreation to avoid unnecessary pod recreation
 	if len(headPods.Items) > 0 {
@@ -1718,7 +1797,7 @@ func (r *RayClusterReconciler) buildHeadPod(ctx context.Context, instance rayv1.
 	// The Ray head port used by workers to connect to the cluster (GCS server port for Ray >= 1.11.0, Redis port for older Ray.)
 	headPort := common.GetHeadPort(instance.Spec.HeadGroupSpec.RayStartParams)
 	autoscalingEnabled := utils.IsAutoscalingEnabled(&instance.Spec)
-	podConf := common.DefaultHeadPodTemplate(ctx, instance, instance.Spec.HeadGroupSpec, podName, headPort)
+	podConf := common.DefaultHeadPodTemplate(ctx, instance, *instance.Spec.HeadGroupSpec, podName, headPort)
 	if len(r.options.HeadSidecarContainers) > 0 {
 		podConf.Spec.Containers = append(podConf.Spec.Containers, r.options.HeadSidecarContainers...)
 	}
@@ -1760,11 +1839,26 @@ func getCreatorCRDType(instance rayv1.RayCluster) utils.CRDType {
 // Build worker instance pods.
 func (r *RayClusterReconciler) buildWorkerPod(ctx context.Context, instance rayv1.RayCluster, worker rayv1.WorkerGroupSpec, replicaGrpName string, replicaIndex int, hostIndex int) corev1.Pod {
 	logger := ctrl.LoggerFrom(ctx)
+	templateHash := utils.WorkerTemplateHash(&instance, worker)
 	podName := utils.PodName(fmt.Sprintf("%s-%s", instance.Name, worker.GroupName), rayv1.WorkerNode, true)
-	fqdnRayIP := utils.GenerateFQDNServiceName(ctx, instance, instance.Namespace) // Fully Qualified Domain Name
-
-	// The Ray head port used by workers to connect to the cluster (GCS server port for Ray >= 1.11.0, Redis port for older Ray.)
-	headPort := common.GetHeadPort(instance.Spec.HeadGroupSpec.RayStartParams)
+	var fqdnRayIP, headPort string
+	if instance.Spec.HeadGroupSpec != nil {
+		fqdnRayIP = utils.GenerateFQDNServiceName(ctx, instance, instance.Namespace)
+		headPort = common.GetHeadPort(instance.Spec.HeadGroupSpec.RayStartParams)
+	} else {
+		// Reconciliation validates the shared endpoint before rendering any Pod.
+		fqdnRayIP, headPort, _ = utils.ExternalHeadAddress(&instance.Spec)
+		worker = *worker.DeepCopy()
+		worker.RayStartParams["node-ip-address"] = "$(POD_IP)"
+		container := &worker.Template.Spec.Containers[0]
+		container.Env = slices.DeleteFunc(container.Env, func(e corev1.EnvVar) bool {
+			return e.Name == "POD_IP" || e.Name == "RAY_HEAD_ADDRESS" || e.Name == utils.KUBERAY_GEN_RAY_START_CMD
+		})
+		container.Env = append([]corev1.EnvVar{
+			{Name: "POD_IP", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"}}},
+			{Name: "RAY_HEAD_ADDRESS", Value: worker.RayStartParams["address"]},
+		}, container.Env...)
+	}
 	autoscalingEnabled := utils.IsAutoscalingEnabled(&instance.Spec)
 	podTemplateSpec := common.DefaultWorkerPodTemplate(ctx, instance, worker, podName, fqdnRayIP, headPort, replicaGrpName, replicaIndex, hostIndex)
 	if len(r.options.WorkerSidecarContainers) > 0 {
@@ -1792,6 +1886,20 @@ func (r *RayClusterReconciler) buildWorkerPod(ctx context.Context, instance rayv
 	}
 	creatorCRDType := getCreatorCRDType(instance)
 	pod := common.BuildPod(ctx, podTemplateSpec, rayv1.WorkerNode, worker.RayStartParams, headPort, autoscalingEnabled, creatorCRDType, fqdnRayIP, r.options.DefaultContainerEnvs, instance.Spec.RayVersion)
+	if instance.Spec.HeadGroupSpec == nil {
+		pod.Labels[utils.WorkerTemplateHashLabel] = templateHash
+		container := &pod.Spec.Containers[0]
+		container.Env = slices.DeleteFunc(container.Env, func(e corev1.EnvVar) bool {
+			return e.Name == utils.RAY_CLOUD_INSTANCE_ID || e.Name == "KUBERAY_WORKER_POD_NAME"
+		})
+		identity := instance.Labels[utils.FederationMemberLabel]
+		if identity == "" {
+			identity = string(instance.UID)
+		}
+		container.Env = append(container.Env,
+			corev1.EnvVar{Name: "KUBERAY_WORKER_POD_NAME", ValueFrom: &corev1.EnvVarSource{FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"}}},
+			corev1.EnvVar{Name: utils.RAY_CLOUD_INSTANCE_ID, Value: identity + "/$(KUBERAY_WORKER_POD_NAME)"})
+	}
 	// Set raycluster instance as the owner and controller
 	if err := controllerutil.SetControllerReference(&instance, &pod, r.Scheme); err != nil {
 		logger.Error(err, "Failed to set controller reference for raycluster pod")
@@ -1990,13 +2098,15 @@ func (r *RayClusterReconciler) calculateStatus(ctx context.Context, instance *ra
 		}
 	}
 
-	// TODO (kevin85421): ObservedGeneration should be used to determine whether to update this CR or not.
 	newInstance.Status.ObservedGeneration = newInstance.ObjectMeta.Generation
 
 	runtimePods := corev1.PodList{}
 	if err := r.List(ctx, &runtimePods, common.RayClusterAllPodsAssociationOptions(newInstance).ToListOptions()...); err != nil {
 		return nil, err
 	}
+	runtimePods.Items = slices.DeleteFunc(runtimePods.Items, func(pod corev1.Pod) bool {
+		return !metav1.IsControlledBy(&pod, newInstance) || isExternallyManagedWorker(newInstance, pod)
+	})
 
 	newInstance.Status.ReadyWorkerReplicas = utils.CalculateReadyReplicas(runtimePods)
 	newInstance.Status.AvailableWorkerReplicas = utils.CalculateAvailableReplicas(runtimePods)
@@ -2416,7 +2526,7 @@ func sumGPUs(resources map[corev1.ResourceName]resource.Quantity) resource.Quant
 
 // setDefaults sets some default values for the RayCluster
 func setDefaults(instance *rayv1.RayCluster) {
-	if instance.Spec.HeadGroupSpec.RayStartParams == nil {
+	if instance.Spec.HeadGroupSpec != nil && instance.Spec.HeadGroupSpec.RayStartParams == nil {
 		instance.Spec.HeadGroupSpec.RayStartParams = map[string]string{}
 	}
 

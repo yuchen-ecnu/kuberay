@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -184,6 +185,9 @@ func GetRayClusterHeadPod(ctx context.Context, reader client.Reader, instance *r
 	if err := reader.List(ctx, &runtimePods, filterLabels.ToListOptions()...); err != nil {
 		return nil, err
 	}
+	runtimePods.Items = slices.DeleteFunc(runtimePods.Items, func(pod corev1.Pod) bool {
+		return !metav1.IsControlledBy(&pod, instance)
+	})
 	if len(runtimePods.Items) == 0 {
 		logger.Info("Found 0 head pod", "filter labels", filterLabels)
 		return nil, nil

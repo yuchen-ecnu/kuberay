@@ -23,7 +23,7 @@ var _ = Describe("RayCluster validating webhook", func() {
 					Name:      longName,
 				},
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{},
@@ -49,7 +49,7 @@ var _ = Describe("RayCluster validating webhook", func() {
 					Name:      "invalid.name",
 				},
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{},
@@ -83,7 +83,7 @@ var _ = Describe("RayCluster validating webhook", func() {
 					Namespace: namespace,
 				},
 				Spec: rayv1.RayClusterSpec{
-					HeadGroupSpec: rayv1.HeadGroupSpec{
+					HeadGroupSpec: &rayv1.HeadGroupSpec{
 						Template: corev1.PodTemplateSpec{
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{},

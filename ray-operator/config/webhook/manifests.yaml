@@ -10,6 +10,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-ray-io-v1-federatedraycluster
+  failurePolicy: Fail
+  name: vfederatedraycluster.kb.io
+  rules:
+  - apiGroups:
+    - ray.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - federatedrayclusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-ray-io-v1-raycluster
   failurePolicy: Fail
   name: vraycluster.kb.io

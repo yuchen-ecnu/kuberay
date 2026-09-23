@@ -290,6 +290,9 @@ rules:
   - leases
   verbs:
   - create
+  - delete
+  - patch
+  - watch
   - get
   - list
   - update
@@ -353,10 +356,23 @@ rules:
   - update
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - ray.io
   resources:
   - rayclusters
   - raycronjobs
+  - federatedrayclusters
   - rayjobs
   - rayservices
   verbs:
@@ -372,6 +388,7 @@ rules:
   resources:
   - rayclusters/finalizers
   - raycronjobs/finalizers
+  - federatedrayclusters/finalizers
   - rayjobs/finalizers
   - rayservices/finalizers
   verbs:
@@ -381,6 +398,7 @@ rules:
   resources:
   - rayclusters/status
   - raycronjobs/status
+  - federatedrayclusters/status
   - rayjobs/status
   - rayservices/status
   verbs:
@@ -396,6 +414,7 @@ rules:
   - delete
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - rbac.authorization.k8s.io

@@ -82,13 +82,19 @@ func (r *NetworkPolicyController) Reconcile(ctx context.Context, req ctrl.Reques
 		mode = *instance.Spec.NetworkPolicy.Mode
 	}
 
-	headNetworkPolicy := r.buildHeadNetworkPolicy(instance, mode)
-	if err := r.createOrUpdateNetworkPolicy(ctx, instance, headNetworkPolicy); err != nil {
-		return ctrl.Result{}, err
+	desiredNames := map[string]bool{}
+	if instance.Spec.HeadGroupSpec != nil {
+		headNetworkPolicy := r.buildHeadNetworkPolicy(instance, mode)
+		if err := r.createOrUpdateNetworkPolicy(ctx, instance, headNetworkPolicy); err != nil {
+			return ctrl.Result{}, err
+		}
+		desiredNames[headNetworkPolicy.Name] = true
 	}
 
-	desiredNames := map[string]bool{headNetworkPolicy.Name: true}
 	for _, group := range instance.Spec.WorkerGroupSpecs {
+		if group.IsExternallyManaged() {
+			continue
+		}
 		groupNetworkPolicy := r.buildWorkerGroupNetworkPolicy(instance, mode, group.GroupName)
 		desiredNames[groupNetworkPolicy.Name] = true
 		if err := r.createOrUpdateNetworkPolicy(ctx, instance, groupNetworkPolicy); err != nil {
@@ -363,6 +369,9 @@ func (r *NetworkPolicyController) buildRayJobPeer(instance *rayv1.RayCluster) *n
 // getHeadPort returns the port number for the given rayStartParams key,
 // falling back to defaultPort if the key is absent or not a valid integer.
 func (r *NetworkPolicyController) getHeadPort(instance *rayv1.RayCluster, rayStartParamKey string, defaultPort int32) int32 {
+	if instance.Spec.HeadGroupSpec == nil {
+		return defaultPort
+	}
 	if portStr, ok := instance.Spec.HeadGroupSpec.RayStartParams[rayStartParamKey]; ok {
 		if port, err := strconv.ParseInt(portStr, 10, 32); err == nil {
 			return int32(port)

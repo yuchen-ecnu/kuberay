@@ -266,8 +266,9 @@ func TestGetRayClusterHeadPod(t *testing.T) {
 
 	headPod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "head-pod",
-			Namespace: cluster.ObjectMeta.Namespace,
+			Name:            "head-pod",
+			Namespace:       cluster.ObjectMeta.Namespace,
+			OwnerReferences: []metav1.OwnerReference{{APIVersion: "ray.io/v1", Kind: "RayCluster", Name: cluster.Name, UID: cluster.UID, Controller: new(true)}},
 			Labels: map[string]string{
 				utils.RayClusterLabelKey:  cluster.Name,
 				utils.RayNodeTypeLabelKey: string(rayv1.HeadNode),

@@ -86,7 +86,7 @@ func rayServiceTemplate(name string, namespace string, serveAppName string) *ray
 			},
 			RayClusterSpec: rayv1.RayClusterSpec{
 				RayVersion: support.GetRayVersion(),
-				HeadGroupSpec: rayv1.HeadGroupSpec{
+				HeadGroupSpec: &rayv1.HeadGroupSpec{
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{

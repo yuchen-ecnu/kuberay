@@ -47,3 +47,8 @@ by some organizations to back user interfaces for KubeRay resource management.
 
 * **KubeRay Dashboard** (Experimental): Starting from KubeRay v1.4.0, we have introduced a new dashboard that enables users to view and manage KubeRay resources.
 While it is not yet production-ready, we welcome your feedback.
+
+## Alpha features
+
+* [FederatedRayCluster](guidance/federated-raycluster.md): managed and manual members,
+  optional kubeconfig, worker startup, status, cleanup, and local kind verification.

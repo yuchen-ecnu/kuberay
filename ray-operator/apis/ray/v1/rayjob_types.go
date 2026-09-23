@@ -216,6 +216,7 @@ type RayJobSpec struct {
 	// +optional
 	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
 	// RayClusterSpec is the cluster template to run the job
+	// +kubebuilder:validation:XValidation:rule="has(self.headGroupSpec)",message="this resource requires a RayCluster with a head"
 	RayClusterSpec *RayClusterSpec `json:"rayClusterSpec,omitempty"`
 	// SubmitterPodTemplate is the template for the pod that will run `ray job submit`.
 	// +optional

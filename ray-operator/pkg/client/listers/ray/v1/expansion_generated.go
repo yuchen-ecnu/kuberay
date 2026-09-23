@@ -2,6 +2,14 @@
 
 package v1
 
+// FederatedRayClusterListerExpansion allows custom methods to be added to
+// FederatedRayClusterLister.
+type FederatedRayClusterListerExpansion interface{}
+
+// FederatedRayClusterNamespaceListerExpansion allows custom methods to be added to
+// FederatedRayClusterNamespaceLister.
+type FederatedRayClusterNamespaceListerExpansion interface{}
+
 // RayClusterListerExpansion allows custom methods to be added to
 // RayClusterLister.
 type RayClusterListerExpansion interface{}
